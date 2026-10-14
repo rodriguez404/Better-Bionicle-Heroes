@@ -11,3 +11,6 @@ bool PatchCallRel32(uintptr_t callSite, const void* newTarget);
 
 // Overwrites `size` bytes at `address` with `call target` followed by NOPs.
 bool WriteCallAndNops(uintptr_t address, size_t size, const void* target);
+
+// Overwrites `size` bytes of game code at `address` with `data`.
+bool WriteCode(uintptr_t address, const void* data, size_t size);

@@ -5,7 +5,9 @@
 #include <string>
 
 #include "addresses.h"
+#include "beam_fix.h"
 #include "cutscene_skip.h"
+#include "display.h"
 #include "log.h"
 #include "pause_menu.h"
 #include "shop_confirm.h"
@@ -62,6 +64,17 @@ void Init()
 
     if (GetPrivateProfileIntA("Shop", "ConfirmDefaultYes", 1, ini.c_str()) != 0)
         InstallShopConfirmYes();
+
+    DisplayConfig display;
+    display.resolutionList = GetPrivateProfileIntA("Display", "ResolutionList", 1, ini.c_str()) != 0;
+    display.aboveDesktop = GetPrivateProfileIntA("Display", "AboveDesktop", 0, ini.c_str()) != 0;
+    display.matchRefresh = GetPrivateProfileIntA("Display", "MatchRefreshRate", 1, ini.c_str()) != 0;
+    display.refreshRate = static_cast<int>(GetPrivateProfileIntA("Display", "RefreshRate", 0, ini.c_str()));
+    if (display.resolutionList || display.matchRefresh)
+        InstallDisplay(display);
+
+    if (GetPrivateProfileIntA("Fixes", "ThokBeamDamage", 1, ini.c_str()) != 0)
+        InstallBeamFix();
 }
 } // namespace
 

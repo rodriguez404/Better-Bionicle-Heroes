@@ -28,6 +28,19 @@ by default.
 - **Purchase confirmations start on YES**, so buying takes one key press less. Other YES/NO
   prompts (like quitting the game) still start on NO.
 
+### Display
+
+- **The video options list your monitor's resolutions** (up to your desktop resolution) instead of
+  the fixed 640x480 … 1600x1200. A resolution set in `nuconfig.txt` now shows correctly instead of
+  "640 x 480", so Accept no longer switches to it.
+- **Fullscreen runs at your Windows refresh rate** (e.g. 144 Hz) instead of always 60 Hz.
+
+### Bug fixes
+
+- **Thok's ice beam damages enemies.** In the original game it never does: his weapon has a small
+  fire delay, so it doesn't fire every frame, the beam keeps restarting and never reaches a damage
+  tick. Now it fires every frame like Vezok's beam and deals the same damage.
+
 ### Diagnostics
 
 - **Hang log.** If the game freezes, the mod writes where it is stuck to
@@ -74,6 +87,15 @@ EscResumes = 1            ; Esc on the pause menu's top level resumes the game
 
 [Shop]
 ConfirmDefaultYes = 1     ; the shop's "buy?" confirmation starts on YES
+
+[Display]
+ResolutionList = 1        ; video options list the monitor's resolutions
+AboveDesktop = 0          ; ... also those above the desktop resolution (DSR/VSR)
+MatchRefreshRate = 1      ; fullscreen at the Windows refresh rate instead of 60 Hz
+RefreshRate = 0           ; fixed refresh rate in Hz (0 = same as Windows)
+
+[Fixes]
+ThokBeamDamage = 1        ; Thok's ice beam damages enemies
 
 [Debug]
 HangWatchdog = 1          ; log where the game is stuck if it freezes

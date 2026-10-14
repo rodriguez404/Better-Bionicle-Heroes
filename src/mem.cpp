@@ -39,3 +39,15 @@ bool WriteCallAndNops(uintptr_t address, size_t size, const void* target)
     FlushInstructionCache(GetCurrentProcess(), code, size);
     return true;
 }
+
+bool WriteCode(uintptr_t address, const void* data, size_t size)
+{
+    auto* code = reinterpret_cast<uint8_t*>(address);
+    DWORD oldProtect;
+    if (!VirtualProtect(code, size, PAGE_EXECUTE_READWRITE, &oldProtect))
+        return false;
+    std::memcpy(code, data, size);
+    VirtualProtect(code, size, oldProtect, &oldProtect);
+    FlushInstructionCache(GetCurrentProcess(), code, size);
+    return true;
+}
