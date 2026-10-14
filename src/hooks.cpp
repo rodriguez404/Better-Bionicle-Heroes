@@ -1,7 +1,6 @@
 #include "hooks.h"
 
 #include "log.h"
-#include "mem.h"
 
 #include <MinHook.h>
 
@@ -16,16 +15,11 @@ bool HooksInit()
     return true;
 }
 
-bool PrologueMatches(const HookSpec& h)
-{
-    return BytesMatch(h.address, h.prologue, sizeof(h.prologue));
-}
-
 bool InstallHook(const HookSpec& h)
 {
-    if (!PrologueMatches(h))
+    if (!h.address)
     {
-        Log("%s @%08X: unexpected bytes, not hooked", h.name, static_cast<unsigned>(h.address));
+        Log("%s: address not found, not hooked", h.name);
         return false;
     }
     void* target = reinterpret_cast<void*>(h.address);

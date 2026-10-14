@@ -8,6 +8,7 @@
 
 #include "shop_confirm.h"
 
+#include "addresses.h"
 #include "hooks.h"
 #include "log.h"
 
@@ -15,14 +16,13 @@
 
 namespace
 {
-constexpr uintptr_t kHighlightTop = 0x4c1670;     // GUI commands: void __cdecl(element, arg)
-constexpr uintptr_t kHighlightBottom = 0x4c16b0;
+// GUI commands HighlightTop / HighlightBottom (0x4c1670 / 0x4c16b0): void __cdecl(element, arg).
 constexpr uintptr_t kElementParent = 0x4c;
 
 using GuiCommand_t = void(__cdecl*)(void* element, void* arg);
 using ElementName_t = const char*(__thiscall*)(void* element);
 GuiCommand_t o_HighlightBottom = nullptr;
-const auto HighlightTop = reinterpret_cast<GuiCommand_t>(kHighlightTop);
+const GameFn<GuiCommand_t> HighlightTop{addr::HighlightTop};
 
 bool IsShopConfirmPage(uintptr_t element)
 {
@@ -53,16 +53,10 @@ void __cdecl hk_HighlightBottom(void* element, void* arg)
 
 bool InstallShopConfirmYes()
 {
-    static const uint8_t kTopBytes[] = {0x8b, 0x44, 0x24, 0x04, 0x8b, 0x88, 0x8c, 0x00, 0x00, 0x00, 0x85, 0xc9,
-                                        0x74, 0x09, 0x8b, 0x40, 0x3c};
-    const HookSpec hook = {"HighlightBottom", kHighlightBottom, {0x8b, 0x44, 0x24, 0x04, 0x8b, 0x88, 0x8c, 0x00},
-                           reinterpret_cast<void*>(&hk_HighlightBottom), reinterpret_cast<void**>(&o_HighlightBottom)};
-    if (std::memcmp(reinterpret_cast<const void*>(kHighlightTop), kTopBytes, sizeof(kTopBytes)) != 0 ||
-        !PrologueMatches(hook))
-    {
-        Log("ShopConfirmYes: this Bionicle.exe build is not the one the mod was made for; feature disabled");
+    if (!AddressesFound("ShopConfirmYes", {&addr::HighlightTop, &addr::HighlightBottom}))
         return false;
-    }
+    const HookSpec hook = {"HighlightBottom", addr::HighlightBottom, reinterpret_cast<void*>(&hk_HighlightBottom),
+                           reinterpret_cast<void**>(&o_HighlightBottom)};
     const bool ok = HooksInit() && InstallHook(hook);
     Log("ShopConfirmYes: %s", ok ? "installed" : "FAILED");
     return ok;

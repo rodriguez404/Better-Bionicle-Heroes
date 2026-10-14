@@ -9,6 +9,7 @@
 
 #include "cutscene_skip.h"
 
+#include "addresses.h"
 #include "hooks.h"
 #include "log.h"
 #include "mem.h"
@@ -23,19 +24,18 @@
 
 namespace
 {
-// 0x486454: test dword [edx+0x78], 0x1810 / jz  (pad 1 "pressed" buttons: skip buttons)
-// 0x486463: cmp byte [edi+0x4e], bl     / jz  (AllowSkip flag) <- the jz is removed
-constexpr uintptr_t kSkipButtonsTest = 0x486454;
-constexpr uintptr_t kAllowSkipCheck = 0x486463;
-constexpr uintptr_t kAllowSkipJump = 0x486466;
-constexpr uintptr_t kCutsceneSkip = 0x41e950;       // void __thiscall(CutsceneManager*, Cutscene*)
-constexpr uintptr_t kPadInput = 0x4862e0;           // void __cdecl(), once per frame
-constexpr uintptr_t kCutsceneManagerPtr = 0x648c50; // CutsceneManager*: +0xa4 = playing cutscene
-constexpr uintptr_t kCutscenePlaying = 0xa4;
+// CutsceneSkipButtons (0x486454 in Bionicle.exe):
+//   +0x00 test dword [edx+0x78], 0x1810 / jz   (pad 1 "pressed" buttons: skip buttons)
+//   +0x09 mov edi, [flags]
+//   +0x0f cmp byte [edi+0x4e], bl     / jz     (AllowSkip flag) <- this jz (+0x12) is removed
+// CutsceneSkip 0x41e950: void __thiscall(CutsceneManager*, Cutscene*); PadInput 0x4862e0: per frame;
+// CutsceneManagerPtr 0x648c50.
+constexpr uintptr_t kAllowSkipJumpOffset = 0x12;
+constexpr uintptr_t kCutscenePlaying = 0xa4;        // CutsceneManager: playing cutscene
 
 using CutsceneSkip_t = void(__thiscall*)(void* manager, void* cutscene);
 using PadInput_t = void(__cdecl*)();
-const auto CutsceneSkip = reinterpret_cast<CutsceneSkip_t>(kCutsceneSkip);
+const GameFn<CutsceneSkip_t> CutsceneSkip{addr::CutsceneSkip};
 PadInput_t o_PadInput = nullptr;
 
 std::vector<int> g_extraKeys;  // virtual-key codes
@@ -54,7 +54,7 @@ void __cdecl hk_PadInput()
     for (int key : g_extraKeys)
         down = down || (GetAsyncKeyState(key) & 0x8000) != 0;
 
-    const uintptr_t manager = *reinterpret_cast<uintptr_t*>(kCutsceneManagerPtr);
+    const uintptr_t manager = *reinterpret_cast<uintptr_t*>(addr::CutsceneManagerPtr);
     void* cutscene = manager ? *reinterpret_cast<void**>(manager + kCutscenePlaying) : nullptr;
     if (cutscene && down && !g_keyWasDown && GameHasFocus())
         CutsceneSkip(reinterpret_cast<void*>(manager), cutscene);
@@ -119,23 +119,21 @@ bool PatchBytes(uintptr_t address, const uint8_t* bytes, size_t size)
 
 bool InstallCutsceneSkip(const char* extraKeys)
 {
-    static const uint8_t kButtons[] = {0xf7, 0x42, 0x78, 0x10, 0x18, 0x00, 0x00, 0x74, 0x1d};
-    static const uint8_t kFlagCheck[] = {0x38, 0x5f, 0x4e, 0x74, 0x12};
-    static const uint8_t kSkipBytes[] = {0x56, 0x57, 0x8b, 0x7c, 0x24, 0x0c, 0x57, 0x8b};
-    const HookSpec padHook = {"PadInput", kPadInput, {0x83, 0xec, 0x08, 0xd9, 0x05, 0xbc, 0xeb, 0x64},
-                              reinterpret_cast<void*>(&hk_PadInput), reinterpret_cast<void**>(&o_PadInput)};
-    if (!BytesMatch(kSkipButtonsTest, kButtons, sizeof(kButtons)) ||
-        !BytesMatch(kAllowSkipCheck, kFlagCheck, sizeof(kFlagCheck)) ||
-        !BytesMatch(kCutsceneSkip, kSkipBytes, sizeof(kSkipBytes)) ||
-        !PrologueMatches(padHook))
+    if (!AddressesFound("CutsceneSkip",
+                        {&addr::CutsceneSkipButtons, &addr::CutsceneSkip, &addr::PadInput, &addr::CutsceneManagerPtr}))
+        return false;
+    const uintptr_t jump = addr::CutsceneSkipButtons + kAllowSkipJumpOffset;
+    if (*reinterpret_cast<const uint8_t*>(jump) != 0x74)  // jz rel8
     {
-        Log("CutsceneSkip: this Bionicle.exe build is not the one the mod was made for; feature disabled");
+        Log("CutsceneSkip: unexpected code at the AllowSkip check; feature disabled");
         return false;
     }
 
     g_extraKeys = ParseKeys(extraKeys);
     static const uint8_t kNops[] = {0x90, 0x90};
-    bool ok = PatchBytes(kAllowSkipJump, kNops, sizeof(kNops));
+    bool ok = PatchBytes(jump, kNops, sizeof(kNops));
+    const HookSpec padHook = {"PadInput", addr::PadInput, reinterpret_cast<void*>(&hk_PadInput),
+                              reinterpret_cast<void**>(&o_PadInput)};
     if (!g_extraKeys.empty())
         ok = HooksInit() && InstallHook(padHook) && ok;
     Log("CutsceneSkip: %s (Esc + %u extra key(s))", ok ? "installed" : "PARTIALLY installed",

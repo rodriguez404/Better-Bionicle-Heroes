@@ -36,16 +36,24 @@ by default.
 
 ## Requirements
 
-- Bionicle Heroes for PC, `Bionicle.exe` with SHA-256
-  `E1DAA3DC24CC184CCE1B0B01DF032BD9A32B2A29D265AE04DBC6C90978D7C4A8`.
-  On any other build the mod changes nothing and says so in its log.
-- [Ultimate ASI Loader](https://github.com/ThirteenAG/Ultimate-ASI-Loader) (x86) as `dinput8.dll`
-  in the game folder (already there if you use BionicleHeroesGFX).
+- Bionicle Heroes for PC. The mod finds the game code it changes by byte signatures, so it works on
+  the same game builds as BionicleHeroesGFX; checked with the NoCD `Bionicle.exe` and
+  `bionicle_win2k.exe` (1.0.0.32). On a build where something is not recognised, only the affected
+  changes stay off, and `BetterBionicleHeroes.log` says which.
 
 ## Installation
 
-Copy `BetterBionicleHeroes.asi` and `BetterBionicleHeroes.ini` next to `Bionicle.exe`.
-To uninstall, delete both files. The mod never writes to save games.
+Extract the release archive into the game folder (next to `Bionicle.exe`). That is all: the archive
+includes [Ultimate ASI Loader](https://github.com/ThirteenAG/Ultimate-ASI-Loader) (`dinput8.dll`),
+which loads the mod.
+
+Works together with [BionicleHeroesGFX](https://github.com/ermaccer/BionicleHeroesGFX) and other
+`.asi` mods: they use the same loader, so install them in any order and let either `dinput8.dll`
+overwrite the other.
+
+To uninstall, delete `BetterBionicleHeroes.asi`, `BetterBionicleHeroes.ini`,
+`BetterBionicleHeroes-README.md` and the `BetterBionicleHeroes-licenses` folder (keep `dinput8.dll`
+if another mod needs it). The mod never writes to save games.
 
 ## Settings at a glance
 
@@ -76,14 +84,21 @@ HangWatchdog = 1          ; log where the game is stuck if it freezes
 Visual Studio Build Tools with the C++ workload and CMake (x86 / Win32 target):
 
 ```
-build.cmd
+build.cmd                 :: build\Release\BetterBionicleHeroes.asi
+package.cmd 1.0.0         :: dist\BetterBionicleHeroes-1.0.0.zip (release archive)
 ```
 
-Output: `build\Release\BetterBionicleHeroes.asi`.
+`package.cmd` needs the x86 `dinput8.dll` of Ultimate ASI Loader in
+`third_party\ultimate-asi-loader\` (not kept in git).
+
+`build\Release\sigtest.exe <path to a game exe>` checks whether every signature is found in that
+exe, without running the game.
 
 ## Credits
 
 - [MinHook](https://github.com/TsudaKageyu/minhook) by Tsuda Kageyu (BSD 2-Clause), vendored in
   `third_party/minhook`.
+- [Ultimate ASI Loader](https://github.com/ThirteenAG/Ultimate-ASI-Loader) by ThirteenAG (MIT),
+  shipped in release archives.
 - [BionicleHeroesGFX](https://github.com/ermaccer/BionicleHeroesGFX) by ermaccer, for showing the
   way in.

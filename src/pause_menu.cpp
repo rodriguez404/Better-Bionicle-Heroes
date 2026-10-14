@@ -11,6 +11,7 @@
 
 #include "pause_menu.h"
 
+#include "addresses.h"
 #include "hooks.h"
 #include "log.h"
 
@@ -20,14 +21,14 @@
 
 namespace
 {
-constexpr uintptr_t kGuiUpdate = 0x4bd040;      // void __thiscall(Gui*, float dt), every frame
-constexpr uintptr_t kOpenPauseMenu = 0x4862a0;  // void __cdecl()
-constexpr uintptr_t kResumeGame = 0x455890;     // GUI command "ResumeGame": void __cdecl(element)
-constexpr uintptr_t kFindGuiObject = 0x4bd2a0;  // void* __thiscall(Gui*, const char* name, int any)
+// Bionicle.exe addresses: GuiUpdate 0x4bd040 (void __thiscall(Gui*, float dt), every frame),
+// OpenPauseMenu 0x4862a0 (void __cdecl()), ResumeGame 0x455890 (GUI command, void __cdecl(element)),
+// FindGuiObject 0x4bd2a0 (void* __thiscall(Gui*, const char* name, int any)),
+// PauseState 0x64e0d8 (+8 = paused, set by 0x44bc40), Pad1Ptr 0x651e20 (+0x78 = buttons pressed).
 constexpr uintptr_t kPageFlags = 0x58;          // bit 0 = page shown
 constexpr uintptr_t kPageBackPage = 0x54;       // page "back" returns to, 0 on a top level page
-constexpr uintptr_t kPauseState = 0x64e0d8;     // +8 = paused (set by 0x44bc40)
-constexpr uintptr_t kPad1Ptr = 0x651e20;        // +0x78 = buttons pressed this frame
+const uintptr_t& kPauseState = addr::PauseState;
+const uintptr_t& kPad1Ptr = addr::Pad1Ptr;
 constexpr uint32_t kPadBack = 0x80;
 constexpr DWORD kGuardMs = 300;
 
@@ -37,8 +38,8 @@ using ResumeGame_t = void(__cdecl*)(void* element);
 using FindGuiObject_t = void*(__thiscall*)(void* gui, const char* name, int any);
 GuiUpdate_t o_GuiUpdate = nullptr;
 OpenPauseMenu_t o_OpenPauseMenu = nullptr;
-const auto ResumeGame = reinterpret_cast<ResumeGame_t>(kResumeGame);
-const auto FindGuiObject = reinterpret_cast<FindGuiObject_t>(kFindGuiObject);
+const GameFn<ResumeGame_t> ResumeGame{addr::ResumeGame};
+const GameFn<FindGuiObject_t> FindGuiObject{addr::FindGuiObject};
 
 DWORD g_openedAt = 0;
 DWORD g_resumedAt = 0;
@@ -105,23 +106,15 @@ void __cdecl hk_OpenPauseMenu()
 
 bool InstallPauseMenuEsc()
 {
-    static const uint8_t kResumeBytes[] = {0xa1, 0x48, 0x75, 0x6a, 0x00, 0x85, 0xc0, 0x74, 0x25, 0x6a};
-    static const uint8_t kFindBytes[] = {0x55, 0x57, 0x8b, 0xf9, 0x8b, 0x8f, 0x74, 0x03};
-    const HookSpec hooks[] = {
-        {"GuiUpdate", kGuiUpdate, {0x51, 0x55, 0x8b, 0xe9, 0x8b, 0x4d, 0x10, 0xf6},
-         reinterpret_cast<void*>(&hk_GuiUpdate), reinterpret_cast<void**>(&o_GuiUpdate)},
-        {"OpenPauseMenu", kOpenPauseMenu, {0x6a, 0x01, 0xb9, 0xd8, 0xe0, 0x64, 0x00, 0xe8},
-         reinterpret_cast<void*>(&hk_OpenPauseMenu), reinterpret_cast<void**>(&o_OpenPauseMenu)},
-    };
-    bool known = std::memcmp(reinterpret_cast<const void*>(kResumeGame), kResumeBytes, sizeof(kResumeBytes)) == 0 &&
-                 std::memcmp(reinterpret_cast<const void*>(kFindGuiObject), kFindBytes, sizeof(kFindBytes)) == 0;
-    for (const auto& h : hooks)
-        known = known && PrologueMatches(h);
-    if (!known)
-    {
-        Log("PauseMenuEsc: this Bionicle.exe build is not the one the mod was made for; feature disabled");
+    if (!AddressesFound("PauseMenuEsc", {&addr::GuiUpdate, &addr::OpenPauseMenu, &addr::ResumeGame,
+                                         &addr::FindGuiObject, &addr::PauseState, &addr::Pad1Ptr}))
         return false;
-    }
+    const HookSpec hooks[] = {
+        {"GuiUpdate", addr::GuiUpdate, reinterpret_cast<void*>(&hk_GuiUpdate),
+         reinterpret_cast<void**>(&o_GuiUpdate)},
+        {"OpenPauseMenu", addr::OpenPauseMenu, reinterpret_cast<void*>(&hk_OpenPauseMenu),
+         reinterpret_cast<void**>(&o_OpenPauseMenu)},
+    };
     bool ok = HooksInit();
     for (const auto& h : hooks)
         ok = ok && InstallHook(h);

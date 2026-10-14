@@ -4,6 +4,7 @@
 
 #include <string>
 
+#include "addresses.h"
 #include "cutscene_skip.h"
 #include "log.h"
 #include "pause_menu.h"
@@ -39,6 +40,8 @@ void Init()
 
     if (GetPrivateProfileIntA("Debug", "HangWatchdog", 1, ini.c_str()) != 0)
         StartHangWatchdog();
+
+    ResolveAddresses();
 
     VezonExtraConfig cfg;
     cfg.extraCharacter = GetPrivateProfileIntA("VezonExtra", "ExtraCharacter", 1, ini.c_str()) != 0;

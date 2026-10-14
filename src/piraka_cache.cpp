@@ -26,8 +26,8 @@ using namespace game;
 namespace
 {
 constexpr uintptr_t kMgrSize = 0x4100;              // allocated at 0x4ac35a
-constexpr uintptr_t kMaterialTable = 0x33a2be0;     // 0x708 entries of 0x214 bytes (alloc 0x5417d0)
-constexpr uintptr_t kMaterialTableEnd = 0x348c880;
+const uintptr_t& kMaterialTable = addr::MaterialTable;        // 0x33a2be0: 0x708 entries of 0x214 bytes
+const uintptr_t& kMaterialTableEnd = addr::MaterialTableEnd;  // 0x348c880   (allocator 0x5417d0)
 constexpr uintptr_t kMaterialSize = 0x214;          // dword 0 bit 0 = entry in use
 
 // Manager fields LoadPirakaModel frees before loading (hidden so the active Piraka survives).
@@ -50,11 +50,11 @@ constexpr uintptr_t kHeldHandles[] = {
 using LoadPirakaModel_t = int(__thiscall*)(void* toy, int charId);
 using ReleaseScene_t = void(__cdecl*)(void* sceneHandleSlot);
 using SubsystemFree_t = int(__thiscall*)(void* subsystem);
-const auto LoadPirakaModel = reinterpret_cast<LoadPirakaModel_t>(kLoadPirakaModel);
-const auto ReleaseScene = reinterpret_cast<ReleaseScene_t>(0x4a16b0);
-const auto FreeSpine = reinterpret_cast<SubsystemFree_t>(0x424540);
-const auto FreeCharacterModel = reinterpret_cast<SubsystemFree_t>(0x424200);
-const auto FreeFace = reinterpret_cast<SubsystemFree_t>(0x4249d0);
+const GameFn<LoadPirakaModel_t> LoadPirakaModel{kLoadPirakaModel};
+const GameFn<ReleaseScene_t> ReleaseScene{addr::ReleaseScene};                // 0x4a16b0
+const GameFn<SubsystemFree_t> FreeSpine{addr::FreeSpine};                      // 0x424540
+const GameFn<SubsystemFree_t> FreeCharacterModel{addr::FreeCharacterModel};    // 0x424200
+const GameFn<SubsystemFree_t> FreeFace{addr::FreeFace};                        // 0x4249d0
 
 struct Cache
 {

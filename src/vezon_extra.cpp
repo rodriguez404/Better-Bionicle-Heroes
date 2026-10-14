@@ -35,18 +35,18 @@ ConstructionUpdate_t o_ConstructionInteract = nullptr;
 ConstructionUpdate_t o_ConstructionBuilding = nullptr;
 LevelLoadConfig_t o_LevelLoadConfig = nullptr;
 
-const auto ZoneToPirakaCharId = reinterpret_cast<ZoneToPirakaCharId_t>(kZoneToPirakaCharId);
-const auto LoadPirakaModel = reinterpret_cast<LoadPirakaModel_t>(kLoadPirakaModel);
-const auto VisualReset = reinterpret_cast<VisualReset_t>(kVisualReset);
-const auto VisualSetup = reinterpret_cast<VisualSetup_t>(kVisualSetup);
-const auto PlayerSetSlot = reinterpret_cast<PlayerSetSlot_t>(kPlayerSetSlot);
-const auto PartyNext = reinterpret_cast<PlayerPartyStep_t>(kPartyNext);
-const auto PartyPrev = reinterpret_cast<PlayerPartyStep_t>(kPartyPrev);
-const auto SaveIsPirakaUnlocked = reinterpret_cast<SaveUnlockCheck_t>(kSaveIsPirakaUnlocked);
-const auto SaveIsPirakaUnlocked2 = reinterpret_cast<SaveUnlockCheck_t>(kSaveIsPirakaUnlocked2);
-const auto SwitchFx = reinterpret_cast<SwitchFx_t>(kSwitchFx);
-const auto PlaySound = reinterpret_cast<PlaySound_t>(kPlaySound);
-const auto IsSwitchBlocked = reinterpret_cast<IsSwitchBlocked_t>(kIsSwitchBlocked);
+const GameFn<ZoneToPirakaCharId_t> ZoneToPirakaCharId{kZoneToPirakaCharId};
+const GameFn<LoadPirakaModel_t> LoadPirakaModel{kLoadPirakaModel};
+const GameFn<VisualReset_t> VisualReset{kVisualReset};
+const GameFn<VisualSetup_t> VisualSetup{kVisualSetup};
+const GameFn<PlayerSetSlot_t> PlayerSetSlot{kPlayerSetSlot};
+const GameFn<PlayerPartyStep_t> PartyNext{kPartyNext};
+const GameFn<PlayerPartyStep_t> PartyPrev{kPartyPrev};
+const GameFn<SaveUnlockCheck_t> SaveIsPirakaUnlocked{kSaveIsPirakaUnlocked};
+const GameFn<SaveUnlockCheck_t> SaveIsPirakaUnlocked2{kSaveIsPirakaUnlocked2};
+const GameFn<SwitchFx_t> SwitchFx{kSwitchFx};
+const GameFn<PlaySound_t> PlaySound{kPlaySound};
+const GameFn<IsSwitchBlocked_t> IsSwitchBlocked{kIsSwitchBlocked};
 
 bool IsZoneBoss(int charId) { return charId >= kCharHakann && charId <= kCharReidak; }
 
@@ -437,8 +437,8 @@ void WheelInvalidate()
 }
 
 DrawMaskIcons_t o_DrawMaskIcons = nullptr;
-const auto DrawSprite = reinterpret_cast<DrawSprite_t>(kDrawSprite);
-const auto SlotSaveVariant = reinterpret_cast<SlotSaveVariant_t>(kSlotSaveVariant);
+const GameFn<DrawSprite_t> DrawSprite{kDrawSprite};
+const GameFn<SlotSaveVariant_t> SlotSaveVariant{kSlotSaveVariant};
 
 // Ring order starting at the current character: ... X -> boss -> Vezon -> Y ...
 int BuildRing(uintptr_t player, int* ring)
@@ -709,40 +709,34 @@ bool InstallVezonExtra(const VezonExtraConfig& cfg)
     g_cfg = cfg;
 
     const HookSpec hooks[] = {
-        {"GetLevelPirakaCharId", kGetLevelPirakaCharId, {0x8b, 0x44, 0x24, 0x04, 0x83, 0xf8, 0xff, 0x8b},
-         reinterpret_cast<void*>(&hk_GetLevelPirakaCharId), reinterpret_cast<void**>(&o_GetLevelPirakaCharId)},
-        {"PlayerInitSlotChars", kPlayerInitSlotChars, {0x56, 0x8b, 0xf1, 0xc7, 0x86, 0xac, 0x12, 0x00},
-         reinterpret_cast<void*>(&hk_PlayerInitSlotChars), reinterpret_cast<void**>(&o_PlayerInitSlotChars)},
-        {"PlayerSwitchInput", kPlayerSwitchInput, {0x53, 0x55, 0x56, 0x8b, 0xf1, 0x8b, 0x9e, 0xa4},
-         reinterpret_cast<void*>(&hk_PlayerSwitchInput), reinterpret_cast<void**>(&o_PlayerSwitchInput)},
-        {"ConstructionInteract", kConstructionInteract, {0x55, 0x8b, 0xec, 0x83, 0xe4, 0xf0, 0x83, 0xec},
-         reinterpret_cast<void*>(&hk_ConstructionInteract), reinterpret_cast<void**>(&o_ConstructionInteract)},
-        {"ConstructionBuilding", kConstructionBuilding, {0x83, 0xec, 0x18, 0x55, 0x56, 0x8b, 0x74, 0x24},
-         reinterpret_cast<void*>(&hk_ConstructionBuilding), reinterpret_cast<void**>(&o_ConstructionBuilding)},
-        {"LevelLoadConfig", kLevelLoadConfig, {0x81, 0xec, 0x1c, 0x03, 0x00, 0x00, 0xa1, 0x88},
-         reinterpret_cast<void*>(&hk_LevelLoadConfig), reinterpret_cast<void**>(&o_LevelLoadConfig)},
-        {"DrawMaskIcons", kDrawMaskIcons, {0xa1, 0x48, 0x75, 0x6a, 0x00, 0x81, 0xec, 0xac},
-         reinterpret_cast<void*>(&hk_DrawMaskIcons), reinterpret_cast<void**>(&o_DrawMaskIcons)},
+        {"GetLevelPirakaCharId", kGetLevelPirakaCharId, reinterpret_cast<void*>(&hk_GetLevelPirakaCharId),
+         reinterpret_cast<void**>(&o_GetLevelPirakaCharId)},
+        {"PlayerInitSlotChars", kPlayerInitSlotChars, reinterpret_cast<void*>(&hk_PlayerInitSlotChars),
+         reinterpret_cast<void**>(&o_PlayerInitSlotChars)},
+        {"PlayerSwitchInput", kPlayerSwitchInput, reinterpret_cast<void*>(&hk_PlayerSwitchInput),
+         reinterpret_cast<void**>(&o_PlayerSwitchInput)},
+        {"ConstructionInteract", kConstructionInteract, reinterpret_cast<void*>(&hk_ConstructionInteract),
+         reinterpret_cast<void**>(&o_ConstructionInteract)},
+        {"ConstructionBuilding", kConstructionBuilding, reinterpret_cast<void*>(&hk_ConstructionBuilding),
+         reinterpret_cast<void**>(&o_ConstructionBuilding)},
+        {"LevelLoadConfig", kLevelLoadConfig, reinterpret_cast<void*>(&hk_LevelLoadConfig),
+         reinterpret_cast<void**>(&o_LevelLoadConfig)},
+        {"DrawMaskIcons", kDrawMaskIcons, reinterpret_cast<void*>(&hk_DrawMaskIcons),
+         reinterpret_cast<void**>(&o_DrawMaskIcons)},
     };
 
-    // Check the whole set (and the call sites) before touching anything.
-    static const uint8_t kCall1[] = {0xe8, 0x70, 0xd2, 0x02, 0x00, 0x85, 0xc0};
-    static const uint8_t kCall2[] = {0xe8, 0x1c, 0xd2, 0x02, 0x00, 0x85, 0xc0};
-    static const uint8_t kHintLow[] = {0x8b, 0x8a, 0xa4, 0x12, 0x00, 0x00, 0x33, 0xdb, 0x3b, 0xcd, 0x0f, 0x94, 0xc3};
-    static const uint8_t kHintBoss[] = {0x8b, 0x81, 0xa4, 0x12, 0x00, 0x00, 0x33, 0xdb,
-                                        0x83, 0xf8, 0x06, 0x0f, 0x94, 0xc3};
-    static_assert(sizeof(kHintLow) == kHintCheckLowTypesLen && sizeof(kHintBoss) == kHintCheckBossTypesLen);
-    bool known = BytesMatch(kLoadCfgVezonCheck1, kCall1, sizeof(kCall1)) &&
-                 BytesMatch(kLoadCfgVezonCheck2, kCall2, sizeof(kCall2)) &&
-                 BytesMatch(kHintCheckLowTypes, kHintLow, sizeof(kHintLow)) &&
-                 BytesMatch(kHintCheckBossTypes, kHintBoss, sizeof(kHintBoss));
-    for (const auto& h : hooks)
-        known = known && PrologueMatches(h);
-    if (!known)
-    {
-        Log("VezonExtra: this Bionicle.exe build is not the one the mod was made for; feature disabled");
+    // Everything is checked before anything is patched.
+    if (!AddressesFound("VezonExtra",
+                        {&addr::GetLevelPirakaCharId, &addr::ZoneToPirakaCharId, &addr::LoadPirakaModel, &addr::VisualReset, &addr::VisualSetup,
+                         &addr::PlayerSetSlot, &addr::PartyNext, &addr::PartyPrev, &addr::PlayerSwitchInput, &addr::PlayerInitSlotChars,
+                         &addr::ConstructionInteract, &addr::ConstructionBuilding, &addr::SaveIsPirakaUnlocked, &addr::SaveIsPirakaUnlocked2,
+                         &addr::SwitchFx, &addr::PlaySound, &addr::IsSwitchBlocked, &addr::LoadCfgVezonCheck1, &addr::LoadCfgVezonCheck2,
+                         &addr::LevelLoadConfig, &addr::DrawMaskIcons, &addr::DrawSprite, &addr::SlotSaveVariant, &addr::HintCheckLowTypes,
+                         &addr::HintCheckBossTypes, &addr::ReleaseScene, &addr::FreeSpine, &addr::FreeCharacterModel, &addr::FreeFace, &addr::PlayerPtr,
+                         &addr::CharMgrPtr, &addr::LevelsPtr, &addr::SaveObject, &addr::CharDefTable, &addr::GuiPtr, &addr::FrameDt, &addr::SmoothRate,
+                         &addr::WheelPulse, &addr::WheelX, &addr::WheelY, &addr::WheelCountCopy, &addr::WheelCount, &addr::SinTable, &addr::ToaIcons,
+                         &addr::PirakaIcons, &addr::UpgradeSprite, &addr::HudPtr, &addr::MaterialTable, &addr::MaterialTableEnd}))
         return false;
-    }
 
     if (!HooksInit())
         return false;

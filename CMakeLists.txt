@@ -18,6 +18,7 @@ add_library(minhook STATIC
 target_include_directories(minhook PUBLIC third_party/minhook/include)
 
 add_library(BetterBionicleHeroes SHARED
+  src/addresses.cpp
   src/cutscene_skip.cpp
   src/dllmain.cpp
   src/hooks.cpp
@@ -33,3 +34,7 @@ target_link_libraries(BetterBionicleHeroes PRIVATE minhook)
 target_compile_definitions(BetterBionicleHeroes PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX _CRT_SECURE_NO_WARNINGS)
 target_compile_options(BetterBionicleHeroes PRIVATE /W4 /permissive-)
 set_target_properties(BetterBionicleHeroes PROPERTIES SUFFIX ".asi")
+
+# Offline signature check against a game exe (not part of the mod).
+add_executable(sigtest tests/sigtest.cpp src/addresses.cpp tests/log_stub.cpp)
+target_compile_definitions(sigtest PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX _CRT_SECURE_NO_WARNINGS)

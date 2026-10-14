@@ -1,7 +1,11 @@
 #pragma once
 
-// Bionicle.exe (SHA-256 E1DAA3DC...C4A8, image base 0x400000, no ASLR).
-// Every address below was found in Ghidra; the ones marked [rt] were also confirmed at runtime.
+// Game addresses and structure layouts. Addresses are found at startup by signatures (addresses.h);
+// the hex values in the comments are the ones in the NoCD Bionicle.exe (SHA-256 E1DAA3DC...C4A8) where
+// they were found in Ghidra. [rt] = also confirmed at runtime. Structure offsets are the same in all
+// supported builds (the signatures cover the code that uses them).
+
+#include "addresses.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -17,11 +21,11 @@ constexpr int kPirakaSlot = 6;
 constexpr int kSlotCount = 7;
 
 // Globals.
-constexpr uintptr_t kPlayerPtr = 0x652cbc;       // Player*                                   [rt]
-constexpr uintptr_t kCharMgrPtr = 0x64ce84;      // character manager*                        [rt]
-constexpr uintptr_t kLevelsPtr = 0x64e0f0;       // +0xc current level, +0xf38 level->zone    [rt]
-constexpr uintptr_t kSaveObject = 0x652d38;      // save/progress object (thiscall `this`)
-constexpr uintptr_t kCharDefTable = 0x63a7c0;    // per-char definition, stride 0x690
+inline const uintptr_t& kPlayerPtr = addr::PlayerPtr;  // 0x652cbc Player*                                   [rt]
+inline const uintptr_t& kCharMgrPtr = addr::CharMgrPtr;  // 0x64ce84 character manager*                        [rt]
+inline const uintptr_t& kLevelsPtr = addr::LevelsPtr;  // 0x64e0f0 +0xc current level, +0xf38 level->zone    [rt]
+inline const uintptr_t& kSaveObject = addr::SaveObject;  // 0x652d38 save/progress object (thiscall `this`)
+inline const uintptr_t& kCharDefTable = addr::CharDefTable;  // 0x63a7c0 per-char definition, stride 0x690
 constexpr uintptr_t kCharDefStride = 0x690;
 constexpr uintptr_t kCharDefVisual = 0x2b0;      // visual descriptor inside a char definition
 
@@ -45,15 +49,15 @@ constexpr uintptr_t kMgrSwitchState = 0x3068;    // switching disabled while in 
 constexpr uintptr_t kPieceType = 0x1d5;          // int8: 0-5 Toa, 6 Piraka, 7 gold, 8-13 boss (charId+2), 14 Vezon [rt]
 
 // HUD object (also drives the "switch to the needed mask" prompt).
-constexpr uintptr_t kHudPtr = 0x6509b8;
+inline const uintptr_t& kHudPtr = addr::HudPtr;  // 0x6509b8
 constexpr uintptr_t kHudHintSlot = 0xb0;         // int16 slot the hint asks for (types > 6 clamp to 6), -1 none
 constexpr uintptr_t kHudHintType = 0xb4;         // int16 raw type of the construction nearby
 constexpr uintptr_t kPlayerHintCooldown = 0x140c;  // float, nonzero right after a hint switch
 
 // HUD update 0x466af0: "can the current character use this?" checks, patched to call our code.
-constexpr uintptr_t kHintCheckLowTypes = 0x466ca5;
+inline const uintptr_t& kHintCheckLowTypes = addr::HintCheckLowTypes;  // 0x466ca5
 constexpr size_t kHintCheckLowTypesLen = 13;
-constexpr uintptr_t kHintCheckBossTypes = 0x466d70;
+inline const uintptr_t& kHintCheckBossTypes = addr::HintCheckBossTypes;  // 0x466d70
 constexpr size_t kHintCheckBossTypesLen = 14;
 
 // Pad fields.
@@ -75,48 +79,47 @@ using SwitchFx_t = void(__thiscall*)(void* visual);
 using PlaySound_t = void(__cdecl*)(void* sound, int flags);
 using IsSwitchBlocked_t = int(__cdecl*)();
 
-constexpr uintptr_t kGetLevelPirakaCharId = 0x425340;
-constexpr uintptr_t kZoneToPirakaCharId = 0x4252e0;
-constexpr uintptr_t kLoadPirakaModel = 0x4291d0;      // [rt]
-constexpr uintptr_t kVisualReset = 0x453f40;          // [rt]
-constexpr uintptr_t kVisualSetup = 0x452cb0;          // [rt]
-constexpr uintptr_t kPlayerSetSlot = 0x494de0;
-constexpr uintptr_t kPartyNext = 0x48ea20;
-constexpr uintptr_t kPartyPrev = 0x48ea70;
-constexpr uintptr_t kPlayerSwitchInput = 0x496220;    // [rt] runs every gameplay frame
-constexpr uintptr_t kPlayerInitSlotChars = 0x48e9b0;
-constexpr uintptr_t kConstructionInteract = 0x47ccc0;
-constexpr uintptr_t kConstructionBuilding = 0x47a9c0;
-constexpr uintptr_t kSaveIsPirakaUnlocked = 0x49a430;
-constexpr uintptr_t kSaveIsPirakaUnlocked2 = 0x49a470;
-constexpr uintptr_t kSwitchFx = 0x4538f0;
-constexpr uintptr_t kPlaySound = 0x4c3dc0;
-constexpr uintptr_t kIsSwitchBlocked = 0x4ce8c0;
-
-constexpr uintptr_t kLevelLoadConfig = 0x46d140;      // int __cdecl(int level, void* arena, void* extra)
+inline const uintptr_t& kGetLevelPirakaCharId = addr::GetLevelPirakaCharId;  // 0x425340
+inline const uintptr_t& kZoneToPirakaCharId = addr::ZoneToPirakaCharId;  // 0x4252e0
+inline const uintptr_t& kLoadPirakaModel = addr::LoadPirakaModel;  // 0x4291d0 [rt]
+inline const uintptr_t& kVisualReset = addr::VisualReset;  // 0x453f40 [rt]
+inline const uintptr_t& kVisualSetup = addr::VisualSetup;  // 0x452cb0 [rt]
+inline const uintptr_t& kPlayerSetSlot = addr::PlayerSetSlot;  // 0x494de0
+inline const uintptr_t& kPartyNext = addr::PartyNext;  // 0x48ea20
+inline const uintptr_t& kPartyPrev = addr::PartyPrev;  // 0x48ea70
+inline const uintptr_t& kPlayerSwitchInput = addr::PlayerSwitchInput;  // 0x496220 [rt] runs every gameplay frame
+inline const uintptr_t& kPlayerInitSlotChars = addr::PlayerInitSlotChars;  // 0x48e9b0
+inline const uintptr_t& kConstructionInteract = addr::ConstructionInteract;  // 0x47ccc0
+inline const uintptr_t& kConstructionBuilding = addr::ConstructionBuilding;  // 0x47a9c0
+inline const uintptr_t& kSaveIsPirakaUnlocked = addr::SaveIsPirakaUnlocked;  // 0x49a430
+inline const uintptr_t& kSaveIsPirakaUnlocked2 = addr::SaveIsPirakaUnlocked2;  // 0x49a470
+inline const uintptr_t& kSwitchFx = addr::SwitchFx;  // 0x4538f0
+inline const uintptr_t& kPlaySound = addr::PlaySound;  // 0x4c3dc0
+inline const uintptr_t& kIsSwitchBlocked = addr::IsSwitchBlocked;  // 0x4ce8c0
+inline const uintptr_t& kLevelLoadConfig = addr::LevelLoadConfig;  // 0x46d140 int __cdecl(int level, void* arena, void* extra)
 using LevelLoadConfig_t = int(__cdecl*)(int level, void* arena, void* extra);
 
 // Level_LoadConfig (0x46d140): "Vezon unlocked -> load Vezon" checks, patched at the call sites.
-constexpr uintptr_t kLoadCfgVezonCheck1 = 0x46d1fb;   // call Save_IsPirakaUnlocked2(6)
-constexpr uintptr_t kLoadCfgVezonCheck2 = 0x46d20f;   // call Save_IsPirakaUnlocked(6)
+inline const uintptr_t& kLoadCfgVezonCheck1 = addr::LoadCfgVezonCheck1;  // 0x46d1fb call Save_IsPirakaUnlocked2(6)
+inline const uintptr_t& kLoadCfgVezonCheck2 = addr::LoadCfgVezonCheck2;  // 0x46d20f call Save_IsPirakaUnlocked(6)
 
 // Character wheel ("DrawMaskIcons" GUI callback, 0x457550). Layout/animation per slot lives in the
 // player (+0x1f08 + slot*0x18); our 8-entry wheel mirrors its rules (decoded from 0x493080/0x457550).
-constexpr uintptr_t kDrawMaskIcons = 0x457550;        // void __cdecl(void* guiElement)
-constexpr uintptr_t kDrawSprite = 0x4ba3a0;           // thiscall, 13 args (ret 0x34)
-constexpr uintptr_t kSlotSaveVariant = 0x49a900;      // int __thiscall(save, slot): Toa upgrade marker
-constexpr uintptr_t kGuiPtr = 0x6a7548;
-constexpr uintptr_t kFrameDt = 0x69aac0;              // float seconds
-constexpr uintptr_t kSmoothRate = 0x69aa88;           // float
-constexpr uintptr_t kWheelPulse = 0x6506b0;           // float 0..1
-constexpr uintptr_t kWheelX = 0x6506b8;               // float screen origin
-constexpr uintptr_t kWheelY = 0x6506bc;
-constexpr uintptr_t kWheelCountCopy = 0x6506c0;
-constexpr uintptr_t kWheelCount = 0x6506c4;           // also read by the wheel frame (0x457ad0)
-constexpr uintptr_t kSinTable = 0x360a300;            // float[0x8000]
-constexpr uintptr_t kToaIcons = 0x64eed0;             // sprite*[6] by slot
-constexpr uintptr_t kPirakaIcons = 0x64eed8;          // sprite*[] by char id (6..12 used)
-constexpr uintptr_t kUpgradeSprite = 0x64f388;        // sprite*
+inline const uintptr_t& kDrawMaskIcons = addr::DrawMaskIcons;  // 0x457550 void __cdecl(void* guiElement)
+inline const uintptr_t& kDrawSprite = addr::DrawSprite;  // 0x4ba3a0 thiscall, 13 args (ret 0x34)
+inline const uintptr_t& kSlotSaveVariant = addr::SlotSaveVariant;  // 0x49a900 int __thiscall(save, slot): Toa upgrade marker
+inline const uintptr_t& kGuiPtr = addr::GuiPtr;  // 0x6a7548
+inline const uintptr_t& kFrameDt = addr::FrameDt;  // 0x69aac0 float seconds
+inline const uintptr_t& kSmoothRate = addr::SmoothRate;  // 0x69aa88 float
+inline const uintptr_t& kWheelPulse = addr::WheelPulse;  // 0x6506b0 float 0..1
+inline const uintptr_t& kWheelX = addr::WheelX;  // 0x6506b8 float screen origin
+inline const uintptr_t& kWheelY = addr::WheelY;  // 0x6506bc
+inline const uintptr_t& kWheelCountCopy = addr::WheelCountCopy;  // 0x6506c0
+inline const uintptr_t& kWheelCount = addr::WheelCount;  // 0x6506c4 also read by the wheel frame (0x457ad0)
+inline const uintptr_t& kSinTable = addr::SinTable;  // 0x360a300 float[0x8000]
+inline const uintptr_t& kToaIcons = addr::ToaIcons;  // 0x64eed0 sprite*[6] by slot
+inline const uintptr_t& kPirakaIcons = addr::PirakaIcons;  // 0x64eed8 sprite*[] by char id (6..12 used)
+inline const uintptr_t& kUpgradeSprite = addr::UpgradeSprite;  // 0x64f388 sprite*
 constexpr uintptr_t kPlayerWheel = 0x1f08;            // per slot 0x18: +4 state, +8 pos, +0xc t, +0x14 scale
 constexpr uintptr_t kPlayerWheelStride = 0x18;
 constexpr float kWheelStep = 35.0f;                   // 0x603d34
