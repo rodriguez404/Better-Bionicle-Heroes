@@ -23,6 +23,11 @@ by default.
 - **Esc closes the pause menu** and resumes the game, like "Resume". In submenus Esc still goes
   one level up.
 
+### Shop
+
+- **Purchase confirmations start on YES**, so buying takes one key press less. Other YES/NO
+  prompts (like quitting the game) still start on NO.
+
 ### Diagnostics
 
 - **Hang log.** If the game freezes, the mod writes where it is stuck to
@@ -58,6 +63,9 @@ ExtraKeys = Space         ; more skip keys, comma-separated (empty = Esc only)
 
 [PauseMenu]
 EscResumes = 1            ; Esc on the pause menu's top level resumes the game
+
+[Shop]
+ConfirmDefaultYes = 1     ; the shop's "buy?" confirmation starts on YES
 
 [Debug]
 HangWatchdog = 1          ; log where the game is stuck if it freezes

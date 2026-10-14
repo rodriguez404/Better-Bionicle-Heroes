@@ -25,6 +25,7 @@ add_library(BetterBionicleHeroes SHARED
   src/mem.cpp
   src/pause_menu.cpp
   src/piraka_cache.cpp
+  src/shop_confirm.cpp
   src/vezon_extra.cpp
   src/watchdog.cpp
 )

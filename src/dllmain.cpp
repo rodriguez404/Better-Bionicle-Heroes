@@ -7,6 +7,7 @@
 #include "cutscene_skip.h"
 #include "log.h"
 #include "pause_menu.h"
+#include "shop_confirm.h"
 #include "vezon_extra.h"
 #include "watchdog.h"
 
@@ -55,6 +56,9 @@ void Init()
 
     if (GetPrivateProfileIntA("PauseMenu", "EscResumes", 1, ini.c_str()) != 0)
         InstallPauseMenuEsc();
+
+    if (GetPrivateProfileIntA("Shop", "ConfirmDefaultYes", 1, ini.c_str()) != 0)
+        InstallShopConfirmYes();
 }
 } // namespace
 
