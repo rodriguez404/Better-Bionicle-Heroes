@@ -87,7 +87,6 @@ void __fastcall hk_GuiUpdate(void* gui, void*, float dt)
     {
         if (const uintptr_t page = ShownPausePage(gui))
         {
-            Log("pause: back on the pause menu -> resume");
             ResumeGame(reinterpret_cast<void*>(page));
             g_resumedAt = GetTickCount();
         }

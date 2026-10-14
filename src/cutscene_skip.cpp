@@ -35,7 +35,7 @@ constexpr uintptr_t kCutscenePlaying = 0xa4;
 
 using CutsceneSkip_t = void(__thiscall*)(void* manager, void* cutscene);
 using PadInput_t = void(__cdecl*)();
-CutsceneSkip_t o_CutsceneSkip = nullptr;
+const auto CutsceneSkip = reinterpret_cast<CutsceneSkip_t>(kCutsceneSkip);
 PadInput_t o_PadInput = nullptr;
 
 std::vector<int> g_extraKeys;  // virtual-key codes
@@ -48,12 +48,6 @@ bool GameHasFocus()
     return pid == GetCurrentProcessId();
 }
 
-void __fastcall hk_CutsceneSkip(void* manager, void*, void* cutscene)
-{
-    Log("cutscene skipped (%p)", cutscene);
-    o_CutsceneSkip(manager, cutscene);
-}
-
 void __cdecl hk_PadInput()
 {
     bool down = false;
@@ -63,7 +57,7 @@ void __cdecl hk_PadInput()
     const uintptr_t manager = *reinterpret_cast<uintptr_t*>(kCutsceneManagerPtr);
     void* cutscene = manager ? *reinterpret_cast<void**>(manager + kCutscenePlaying) : nullptr;
     if (cutscene && down && !g_keyWasDown && GameHasFocus())
-        hk_CutsceneSkip(reinterpret_cast<void*>(manager), nullptr, cutscene);
+        CutsceneSkip(reinterpret_cast<void*>(manager), cutscene);
     g_keyWasDown = down;
 
     o_PadInput();
@@ -127,12 +121,12 @@ bool InstallCutsceneSkip(const char* extraKeys)
 {
     static const uint8_t kButtons[] = {0xf7, 0x42, 0x78, 0x10, 0x18, 0x00, 0x00, 0x74, 0x1d};
     static const uint8_t kFlagCheck[] = {0x38, 0x5f, 0x4e, 0x74, 0x12};
-    const HookSpec skipHook = {"CutsceneSkip", kCutsceneSkip, {0x56, 0x57, 0x8b, 0x7c, 0x24, 0x0c, 0x57, 0x8b},
-                               reinterpret_cast<void*>(&hk_CutsceneSkip), reinterpret_cast<void**>(&o_CutsceneSkip)};
+    static const uint8_t kSkipBytes[] = {0x56, 0x57, 0x8b, 0x7c, 0x24, 0x0c, 0x57, 0x8b};
     const HookSpec padHook = {"PadInput", kPadInput, {0x83, 0xec, 0x08, 0xd9, 0x05, 0xbc, 0xeb, 0x64},
                               reinterpret_cast<void*>(&hk_PadInput), reinterpret_cast<void**>(&o_PadInput)};
     if (!BytesMatch(kSkipButtonsTest, kButtons, sizeof(kButtons)) ||
-        !BytesMatch(kAllowSkipCheck, kFlagCheck, sizeof(kFlagCheck)) || !PrologueMatches(skipHook) ||
+        !BytesMatch(kAllowSkipCheck, kFlagCheck, sizeof(kFlagCheck)) ||
+        !BytesMatch(kCutsceneSkip, kSkipBytes, sizeof(kSkipBytes)) ||
         !PrologueMatches(padHook))
     {
         Log("CutsceneSkip: this Bionicle.exe build is not the one the mod was made for; feature disabled");
@@ -142,9 +136,8 @@ bool InstallCutsceneSkip(const char* extraKeys)
     g_extraKeys = ParseKeys(extraKeys);
     static const uint8_t kNops[] = {0x90, 0x90};
     bool ok = PatchBytes(kAllowSkipJump, kNops, sizeof(kNops));
-    ok = HooksInit() && InstallHook(skipHook) && ok;
     if (!g_extraKeys.empty())
-        ok = InstallHook(padHook) && ok;
+        ok = HooksInit() && InstallHook(padHook) && ok;
     Log("CutsceneSkip: %s (Esc + %u extra key(s))", ok ? "installed" : "PARTIALLY installed",
         static_cast<unsigned>(g_extraKeys.size()));
     return ok;
