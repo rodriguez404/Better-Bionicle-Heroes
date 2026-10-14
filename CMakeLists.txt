@@ -18,9 +18,12 @@ add_library(minhook STATIC
 target_include_directories(minhook PUBLIC third_party/minhook/include)
 
 add_library(BetterBionicleHeroes SHARED
+  src/cutscene_skip.cpp
   src/dllmain.cpp
+  src/hooks.cpp
   src/log.cpp
   src/mem.cpp
+  src/pause_menu.cpp
   src/piraka_cache.cpp
   src/vezon_extra.cpp
   src/watchdog.cpp

@@ -13,12 +13,12 @@
 #include "vezon_extra.h"
 
 #include "game.h"
+#include "hooks.h"
 #include "log.h"
 #include "mem.h"
 #include "piraka_cache.h"
 
 #include <windows.h>
-#include <MinHook.h>
 
 #include <cmath>
 
@@ -702,30 +702,6 @@ void __cdecl hk_DrawMaskIcons(void* guiElement)
     WheelDraw(player, bossId);
 }
 
-struct HookSpec
-{
-    const char* name;
-    uintptr_t address;
-    uint8_t prologue[8];
-    void* detour;
-    void** original;
-};
-
-bool Hook(const HookSpec& h)
-{
-    if (!BytesMatch(h.address, h.prologue, sizeof(h.prologue)))
-    {
-        Log("%s @%08X: unexpected bytes, not hooked", h.name, static_cast<unsigned>(h.address));
-        return false;
-    }
-    void* target = reinterpret_cast<void*>(h.address);
-    if (MH_CreateHook(target, h.detour, h.original) != MH_OK || MH_EnableHook(target) != MH_OK)
-    {
-        Log("%s @%08X: MinHook failed", h.name, static_cast<unsigned>(h.address));
-        return false;
-    }
-    return true;
-}
 } // namespace
 
 bool InstallVezonExtra(const VezonExtraConfig& cfg)
@@ -761,23 +737,19 @@ bool InstallVezonExtra(const VezonExtraConfig& cfg)
                  BytesMatch(kHintCheckLowTypes, kHintLow, sizeof(kHintLow)) &&
                  BytesMatch(kHintCheckBossTypes, kHintBoss, sizeof(kHintBoss));
     for (const auto& h : hooks)
-        known = known && BytesMatch(h.address, h.prologue, sizeof(h.prologue));
+        known = known && PrologueMatches(h);
     if (!known)
     {
         Log("VezonExtra: this Bionicle.exe build is not the one the mod was made for; feature disabled");
         return false;
     }
 
-    const MH_STATUS mh = MH_Initialize();
-    if (mh != MH_OK && mh != MH_ERROR_ALREADY_INITIALIZED)
-    {
-        Log("VezonExtra: MH_Initialize failed");
+    if (!HooksInit())
         return false;
-    }
 
     bool ok = true;
     for (const auto& h : hooks)
-        ok = Hook(h) && ok;
+        ok = InstallHook(h) && ok;
     ok = PatchCallRel32(kLoadCfgVezonCheck1, reinterpret_cast<void*>(&hk_LoadCfgVezonCheck1)) && ok;
     ok = WriteCallAndNops(kHintCheckLowTypes, kHintCheckLowTypesLen, reinterpret_cast<void*>(&HintCheckLowTypes)) && ok;
     ok = WriteCallAndNops(kHintCheckBossTypes, kHintCheckBossTypesLen, reinterpret_cast<void*>(&HintCheckBossTypes)) && ok;

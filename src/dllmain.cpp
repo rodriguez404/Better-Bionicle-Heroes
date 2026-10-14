@@ -4,7 +4,9 @@
 
 #include <string>
 
+#include "cutscene_skip.h"
 #include "log.h"
+#include "pause_menu.h"
 #include "vezon_extra.h"
 #include "watchdog.h"
 
@@ -43,6 +45,16 @@ void Init()
     cfg.instantSwap = GetPrivateProfileIntA("VezonExtra", "InstantSwap", 1, ini.c_str()) != 0;
     if (cfg.extraCharacter || cfg.restrictVezon)
         InstallVezonExtra(cfg);
+
+    if (GetPrivateProfileIntA("CutsceneSkip", "Enabled", 1, ini.c_str()) != 0)
+    {
+        char keys[128] = {};
+        GetPrivateProfileStringA("CutsceneSkip", "ExtraKeys", "Space", keys, sizeof(keys), ini.c_str());
+        InstallCutsceneSkip(keys);
+    }
+
+    if (GetPrivateProfileIntA("PauseMenu", "EscResumes", 1, ini.c_str()) != 0)
+        InstallPauseMenuEsc();
 }
 } // namespace
 

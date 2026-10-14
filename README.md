@@ -2,25 +2,32 @@
 
 Gameplay mod for **Bionicle Heroes** (PC, 2006), loaded as an `.asi` plugin.
 
-## Features
+## Changes
 
-### Vezon as an 8th character
+Every change can be turned on or off in `BetterBionicleHeroes.ini` (next to the game's
+`Bionicle.exe`): set the key to `1` (on) or `0` (off) and restart the game. All changes are **on**
+by default.
 
-In the original game, beating Vezon makes him *replace* the zone boss: in every zone level the
-Piraka slot holds Vezon instead of Vezok, Reidak, Hakann, Avak, Thok or Zaktan, and Vezon can use
-all of their constructions.
+### Vezon no longer **Replaces** Zone Boss
 
-With this mod, once Vezon is beaten:
+- **Vezon is added, not swapped in.** So with Vezon unlocked, you can have up to 8 playable characters now (6 Toa + Zone Boss + Vezon).
+- **Due to this, Vezon no longer uses the bosses' powers.** The zone boss's constructions belong to the boss
+  again: Vezon keeps his own black ones.
 
-- each zone level keeps its boss **and** adds Vezon, so the character wheel holds up to 8
-  characters (6 Toa + the zone boss + Vezon);
-- the mouse wheel cycles `… → zone boss → Vezon → …`, both directions;
-- switching between the boss and Vezon is instant: both models stay loaded;
-- the zone boss's constructions belong to the boss again — Vezon can't use them (the hint shows
-  "switch mask" with the boss icon) and keeps his own black ones;
-- the "switch to the needed mask" prompt picks the boss or Vezon depending on the construction.
+### Skippable cutscenes
 
-Outside zone levels (the hub) and before Vezon is beaten, the game behaves as usual.
+- **In-level cutscenes can be skipped** with **Esc** or **Space**.
+
+### Pause menu
+
+- **Esc closes the pause menu** and resumes the game, like "Resume". In submenus Esc still goes
+  one level up.
+
+### Diagnostics
+
+- **Hang log.** If the game freezes, the mod writes where it is stuck to
+  `BetterBionicleHeroes.log` (wait ~20 s before closing the game). It does nothing otherwise.
+  — `[Debug] HangWatchdog`
 
 ## Requirements
 
@@ -35,14 +42,26 @@ Outside zone levels (the hub) and before Vezon is beaten, the game behaves as us
 Copy `BetterBionicleHeroes.asi` and `BetterBionicleHeroes.ini` next to `Bionicle.exe`.
 To uninstall, delete both files. The mod never writes to save games.
 
-## Settings (`BetterBionicleHeroes.ini`)
+## Settings at a glance
 
-| Key | Default | Meaning |
-|---|---|---|
-| `[VezonExtra] ExtraCharacter` | 1 | Vezon joins next to the zone boss instead of replacing him |
-| `[VezonExtra] RestrictVezonPowers` | 1 | Vezon can't use boss constructions (only with `ExtraCharacter = 1`) |
-| `[VezonExtra] InstantSwap` | 1 | Keep boss and Vezon loaded together; 0 = reload the model on each switch (~40 ms hitch) |
-| `[Debug] HangWatchdog` | 1 | If the game freezes, log where it is stuck to `BetterBionicleHeroes.log` |
+`BetterBionicleHeroes.ini`, `1` = on, `0` = off:
+
+```ini
+[VezonExtra]
+ExtraCharacter = 1        ; Vezon joins next to the zone boss instead of replacing him
+RestrictVezonPowers = 1   ; Vezon can't use the bosses' constructions (needs ExtraCharacter = 1)
+InstantSwap = 1           ; no hitch when switching between the boss and Vezon
+
+[CutsceneSkip]
+Enabled = 1               ; in-level cutscenes can be skipped with Esc
+ExtraKeys = Space         ; more skip keys, comma-separated (empty = Esc only)
+
+[PauseMenu]
+EscResumes = 1            ; Esc on the pause menu's top level resumes the game
+
+[Debug]
+HangWatchdog = 1          ; log where the game is stuck if it freezes
+```
 
 ## Building
 
