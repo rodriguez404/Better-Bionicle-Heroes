@@ -9,6 +9,8 @@
 // still has 7 slots; slot 6 changes identity between the two Piraka, which are both kept loaded
 // (piraka_cache.cpp; reloading the model on demand is the fallback). While the boss is in the
 // ring, Vezon is denied boss constructions (types 6 and 8-13) and keeps his own (type 14).
+// The game's mask lock for slot 6 is shared too, so a death of one of them is tracked here: the dead
+// one leaves the ring and the other one keeps slot 6.
 
 #include "vezon_extra.h"
 
@@ -27,6 +29,12 @@ using namespace game;
 namespace
 {
 VezonExtraConfig g_cfg;
+
+// Masks lost by the boss / Vezon (the game's lock of slot 6 stays 0 while one of them is left), and
+// the Piraka whose death is running while the other one is still there (-1 none).
+bool g_lostBoss = false;
+bool g_lostVezon = false;
+int g_dying = -1;
 
 GetLevelPirakaCharId_t o_GetLevelPirakaCharId = nullptr;
 PlayerSwitchInput_t o_PlayerSwitchInput = nullptr;
@@ -73,6 +81,19 @@ int LoadedPiraka()
 {
     const uintptr_t mgr = CharMgr();
     return mgr ? At<int>(mgr, kMgrLoadedPiraka) : -1;
+}
+
+bool PirakaLost(int charId)
+{
+    return charId == kCharVezon ? g_lostVezon : g_lostBoss;
+}
+
+void ResetLostMasks(const char* why)
+{
+    if (g_lostBoss || g_lostVezon || g_dying >= 0)
+        Log("VezonExtra: boss and Vezon masks back (%s)", why);
+    g_lostBoss = g_lostVezon = false;
+    g_dying = -1;
 }
 
 // Vezon is offered as the extra character in this level right now.
@@ -224,6 +245,7 @@ int __cdecl hk_LevelLoadConfig(int level, void* arena, void* extra)
 {
     PirakaCacheRelease();
     WheelInvalidate();  // a new level starts with a fresh wheel layout
+    ResetLostMasks("level load");
     const int result = o_LevelLoadConfig(level, arena, extra);
     const int boss = ZoneBossForLevel(-1);
     if (g_cfg.extraCharacter && g_cfg.instantSwap && IsZoneBoss(boss) && VezonUnlocked() && LoadedPiraka() == boss)
@@ -250,7 +272,7 @@ void __fastcall hk_PlayerSwitchInput(void* playerPtr, void*, void* pad)
 {
     const auto player = reinterpret_cast<uintptr_t>(playerPtr);
     int bossId = -1;
-    if (!g_cfg.extraCharacter || !pad || !ExtraActive(player, bossId) || !SwitchAllowed(player))
+    if (!g_cfg.extraCharacter || !pad || g_dying >= 0 || !ExtraActive(player, bossId) || !SwitchAllowed(player))
         return o_PlayerSwitchInput(playerPtr, pad);
 
     auto& pressed = At<uint8_t>(reinterpret_cast<uintptr_t>(pad), kPadPressed);
@@ -286,8 +308,8 @@ void __fastcall hk_PlayerSwitchInput(void* playerPtr, void*, void* pad)
 
     if (slot == kPirakaSlot)
     {
-        const bool toVezon = next && loaded != kCharVezon;
-        const bool toBoss = prev && loaded == kCharVezon;
+        const bool toVezon = next && loaded != kCharVezon && !g_lostVezon;
+        const bool toBoss = prev && loaded == kCharVezon && !g_lostBoss;
         if (toVezon || toBoss)
         {
             SwapInPlace(player, toVezon ? kCharVezon : bossId);
@@ -300,11 +322,14 @@ void __fastcall hk_PlayerSwitchInput(void* playerPtr, void*, void* pad)
         return o_PlayerSwitchInput(playerPtr, pad);
     }
 
-    // Entering slot 6 from the side: next lands on the boss, previous lands on Vezon.
+    // Entering slot 6 from the side: next lands on the boss, previous lands on Vezon (or on the one
+    // whose mask is not lost).
     const int target = next ? PartyNext(playerPtr) : PartyPrev(playerPtr);
     if (target == kPirakaSlot)
     {
-        const int wanted = next ? bossId : kCharVezon;
+        int wanted = next ? bossId : kCharVezon;
+        if (PirakaLost(wanted))
+            wanted = wanted == kCharVezon ? bossId : kCharVezon;
         if (loaded != wanted)
             LoadSlot6Character(player, wanted);
     }
@@ -440,7 +465,8 @@ DrawMaskIcons_t o_DrawMaskIcons = nullptr;
 const GameFn<DrawSprite_t> DrawSprite{kDrawSprite};
 const GameFn<SlotSaveVariant_t> SlotSaveVariant{kSlotSaveVariant};
 
-// Ring order starting at the current character: ... X -> boss -> Vezon -> Y ...
+// Ring order starting at the current character: ... X -> boss -> Vezon -> Y ... (without a Piraka
+// whose mask is lost).
 int BuildRing(uintptr_t player, int* ring)
 {
     const bool vezonCurrent = LoadedPiraka() == kCharVezon;
@@ -456,12 +482,14 @@ int BuildRing(uintptr_t player, int* ring)
         else if (i == 0 && vezonCurrent)
         {
             ring[n++] = kEntryVezon;
-            tailBoss = 1;  // the boss sits just before Vezon, i.e. at the end of the ring
+            tailBoss = !g_lostBoss;  // the boss sits just before Vezon, i.e. at the end of the ring
         }
         else
         {
-            ring[n++] = kEntryBoss;
-            ring[n++] = kEntryVezon;
+            if (!g_lostBoss)
+                ring[n++] = kEntryBoss;
+            if (!g_lostVezon)
+                ring[n++] = kEntryVezon;
         }
     }
     if (tailBoss)
@@ -498,7 +526,7 @@ void WheelReset(uintptr_t player)
 }
 
 // FUN_00493080's position rules over the logical ring.
-void WheelLayout(uintptr_t player)
+void WheelLayout(uintptr_t player, int bossId)
 {
     Wheel& w = g_wheel;
     for (int i = 0; i < kWheelEntries; ++i)
@@ -506,6 +534,17 @@ void WheelLayout(uintptr_t player)
         const uintptr_t src = GameWheelSlot(player, i < kPirakaSlot ? i : kPirakaSlot);
         w.e[i].state = At<int>(src, 4);
         w.e[i].t = At<float>(src, 0xc);
+    }
+    // Boss and Vezon follow slot 6, except one whose mask is lost (gone) and, while one of them dies,
+    // the other one (stays).
+    for (int i = kEntryBoss; i <= kEntryVezon; ++i)
+    {
+        const int charId = i == kEntryVezon ? kCharVezon : bossId;
+        if (PirakaLost(charId) || (g_dying >= 0 && g_dying != charId))
+        {
+            w.e[i].state = PirakaLost(charId) ? 0 : 1;
+            w.e[i].t = 0.0f;
+        }
     }
     w.count = BuildRing(player, w.ring);
     const int n = w.count;
@@ -698,8 +737,187 @@ void __cdecl hk_DrawMaskIcons(void* guiElement)
         Log("wheel: 8-entry mode on (boss %d, icons boss=%p vezon=%p)", bossId,
             At<void*>(kPirakaIcons, bossId * 4), At<void*>(kPirakaIcons, kCharVezon * 4));
     }
-    WheelLayout(player);
+    WheelLayout(player, bossId);
     WheelDraw(player, bossId);
+}
+
+// --- separate masks for the boss and Vezon -----------------------------------------------------
+//
+// A death of the slot-6 character would lock slot 6, and slot 6 never comes back in a level (there
+// is no mask pickup for it), so both Piraka were gone. Now the dead one is marked lost and the other
+// one is put back into slot 6. Both come back with the rest of the party (BuildParty: a death with
+// nobody left, a new level).
+
+PlayerDeathStart_t o_PlayerDeathStart = nullptr;
+PlayerDeathUpdate_t o_PlayerDeathUpdate = nullptr;
+PlayerRestoreSlot_t o_PlayerRestoreSlot = nullptr;
+PlayerBuildParty_t o_PlayerBuildParty = nullptr;
+HudUpdate_t o_HudUpdate = nullptr;
+
+bool InParty(uintptr_t player, int slot)
+{
+    for (int i = 0; i < kSlotCount; ++i)
+        if (At<int>(player, kPlayerParty + i * 4) == slot)
+            return true;
+    return false;
+}
+
+// The game's own "is anyone else left" check (0x493910, 0x499150), over the Toa.
+bool ToaAvailable(uintptr_t player)
+{
+    const int current = At<int>(player, kPlayerSlot);
+    for (int slot = 0; slot < kPirakaSlot; ++slot)
+        if (slot != current && At<float>(player, kPlayerSlotLock + slot * 4) == 0.0f &&
+            At<int>(player, kPlayerSlotChar + slot * 4) != kCharNone)
+            return true;
+    return false;
+}
+
+// With no Toa left the game would take the death as the last one (5 s, then the whole party comes
+// back). The other Piraka is still there, so for the length of one game call a locked Toa slot that
+// is not in the party is shown as available: the game takes its usual path (2 s, slot locked, switch
+// to the party's next available character, which with only slot 6 in the party is slot 6 itself).
+class OtherPirakaStandIn
+{
+public:
+    explicit OtherPirakaStandIn(uintptr_t player) : player_(player)
+    {
+        if (At<int>(player, kPlayerSlot) != kPirakaSlot || ToaAvailable(player))
+            return;
+        for (int slot = 0; slot < kPirakaSlot; ++slot)
+            if (At<int>(player, kPlayerSlotChar + slot * 4) != kCharNone && !InParty(player, slot))
+            {
+                slot_ = slot;
+                break;
+            }
+        if (slot_ < 0)
+            return;
+        float& lock = At<float>(player, kPlayerSlotLock + slot_ * 4);
+        saved_ = lock;
+        lock = 0.0f;
+    }
+    ~OtherPirakaStandIn()
+    {
+        if (slot_ >= 0)
+            At<float>(player_, kPlayerSlotLock + slot_ * 4) = saved_;
+    }
+    OtherPirakaStandIn(const OtherPirakaStandIn&) = delete;
+    OtherPirakaStandIn& operator=(const OtherPirakaStandIn&) = delete;
+
+private:
+    uintptr_t player_;
+    int slot_ = -1;
+    float saved_ = 0.0f;
+};
+
+void __fastcall hk_PlayerDeathStart(void* playerPtr)
+{
+    const auto player = reinterpret_cast<uintptr_t>(playerPtr);
+    g_dying = -1;
+    int bossId = -1;
+    if (!g_cfg.extraCharacter || At<int>(player, kPlayerSlot) != kPirakaSlot || !ExtraActive(player, bossId))
+        return o_PlayerDeathStart(playerPtr);
+    const int dying = LoadedPiraka();
+    const int other = dying == kCharVezon ? bossId : kCharVezon;
+    if ((dying != bossId && dying != kCharVezon) || PirakaLost(other))
+        return o_PlayerDeathStart(playerPtr);
+    g_dying = dying;
+    const OtherPirakaStandIn standIn(player);
+    o_PlayerDeathStart(playerPtr);
+}
+
+// The death is over and the game has locked slot 6: the dead Piraka is lost, the other one takes
+// slot 6 and the slot is given back.
+void FinishPirakaDeath(uintptr_t player)
+{
+    const int dead = g_dying;
+    g_dying = -1;
+    const int other = dead == kCharVezon ? ZoneBossForLevel(-1) : kCharVezon;
+    if (!IsZoneBoss(other) && other != kCharVezon)
+        return;
+    (dead == kCharVezon ? g_lostVezon : g_lostBoss) = true;
+
+    void* playerPtr = reinterpret_cast<void*>(player);
+    const bool noToaLeft = At<int>(player, kPlayerSlot) == kPirakaSlot;  // the game stayed in slot 6
+    if (noToaLeft)
+    {
+        o_PlayerRestoreSlot(playerPtr, kPirakaSlot);
+        SwapInPlace(player, other);
+    }
+    else if (LoadSlot6Character(player, other))
+        o_PlayerRestoreSlot(playerPtr, kPirakaSlot);
+
+    if (LoadedPiraka() != other)
+    {
+        // Loading failed: slot 6 keeps the dead Piraka, as in the original game (locked unless it
+        // was the last character, in which case it is back as the game's respawn).
+        Log("VezonExtra: char %d died, char %d could not take slot 6", dead, other);
+        if (noToaLeft)
+            (dead == kCharVezon ? g_lostVezon : g_lostBoss) = false;
+        return;
+    }
+    At<uint8_t>(player, kPlayerMaskDropped + kPirakaSlot) = 0;
+    // Slot 6's wheel icon went out with the death and RestoreSlot lets it come in again; the one
+    // that stays should just stay.
+    At<int>(GameWheelSlot(player, kPirakaSlot), 4) = 1;
+    At<float>(GameWheelSlot(player, kPirakaSlot), 0xc) = 0.0f;
+    Log("VezonExtra: char %d lost its mask, char %d keeps slot 6%s", dead, other, noToaLeft ? " (no Toa left)" : "");
+}
+
+void __fastcall hk_PlayerDeathUpdate(void* playerPtr, void*, void* pad)
+{
+    if (g_dying < 0)
+        return o_PlayerDeathUpdate(playerPtr, pad);
+    const auto player = reinterpret_cast<uintptr_t>(playerPtr);
+    const bool wasDying = At<float>(player, kPlayerDeathTimer) != 0.0f;
+    {
+        const OtherPirakaStandIn standIn(player);
+        o_PlayerDeathUpdate(playerPtr, pad);
+    }
+    // g_dying is cleared if the game rebuilt the party instead (nobody left after all).
+    if (g_dying >= 0 && wasDying && At<float>(player, kPlayerDeathTimer) == 0.0f)
+        FinishPirakaDeath(player);
+}
+
+// The game gives slot 6 back (the "all masks" cheat): both Piraka are back.
+void __fastcall hk_PlayerRestoreSlot(void* player, void*, int slot)
+{
+    if (slot == kPirakaSlot)
+        ResetLostMasks("slot 6 restored");
+    o_PlayerRestoreSlot(player, slot);
+}
+
+void __fastcall hk_PlayerBuildParty(void* player, void*, int arg)
+{
+    ResetLostMasks("party rebuilt");
+    o_PlayerBuildParty(player, arg);
+}
+
+// Near a construction for a Piraka whose mask is lost, the HUD shows it as for any lost mask (no
+// "switch" prompt, no hint switch): during the update it sees slot 6 locked.
+void __fastcall hk_HudUpdate(void* hud, void*, void* a, void* b)
+{
+    const uintptr_t player = Player();
+    int bossId = -1;
+    if (!(g_lostBoss || g_lostVezon) || !player || !ExtraActive(player, bossId))
+        return o_HudUpdate(hud, a, b);
+    // The piece the update itself looks at (0x466b2b).
+    const uintptr_t nearby = At<uintptr_t>(player, kPlayerNearConstruction);
+    const uintptr_t piece = nearby ? At<uintptr_t>(nearby, kNearConstructionPiece) : 0;
+    if (!piece)
+        return o_HudUpdate(hud, a, b);
+    const int type = At<int8_t>(piece, kPieceType);
+    int wanted = -1;
+    if (type == kCharVezon + 2)
+        wanted = kCharVezon;
+    else if (type == kPirakaSlot || (type >= kCharHakann + 2 && type <= kCharReidak + 2))
+        wanted = bossId;
+    if (wanted < 0 || !PirakaLost(wanted))
+        return o_HudUpdate(hud, a, b);
+    float& lock = At<float>(player, kPlayerSlotLock + kPirakaSlot * 4);
+    lock = kMaskLostLock;
+    o_HudUpdate(hud, a, b);
+    lock = 0.0f;
 }
 
 } // namespace
@@ -723,6 +941,15 @@ bool InstallVezonExtra(const VezonExtraConfig& cfg)
          reinterpret_cast<void**>(&o_LevelLoadConfig)},
         {"DrawMaskIcons", kDrawMaskIcons, reinterpret_cast<void*>(&hk_DrawMaskIcons),
          reinterpret_cast<void**>(&o_DrawMaskIcons)},
+        {"PlayerDeathStart", kPlayerDeathStart, reinterpret_cast<void*>(&hk_PlayerDeathStart),
+         reinterpret_cast<void**>(&o_PlayerDeathStart)},
+        {"PlayerDeathUpdate", kPlayerDeathUpdate, reinterpret_cast<void*>(&hk_PlayerDeathUpdate),
+         reinterpret_cast<void**>(&o_PlayerDeathUpdate)},
+        {"PlayerRestoreSlot", kPlayerRestoreSlot, reinterpret_cast<void*>(&hk_PlayerRestoreSlot),
+         reinterpret_cast<void**>(&o_PlayerRestoreSlot)},
+        {"PlayerBuildParty", kPlayerBuildParty, reinterpret_cast<void*>(&hk_PlayerBuildParty),
+         reinterpret_cast<void**>(&o_PlayerBuildParty)},
+        {"HudUpdate", kHudUpdate, reinterpret_cast<void*>(&hk_HudUpdate), reinterpret_cast<void**>(&o_HudUpdate)},
     };
 
     // Everything is checked before anything is patched.
@@ -735,7 +962,9 @@ bool InstallVezonExtra(const VezonExtraConfig& cfg)
                          &addr::HintCheckBossTypes, &addr::ReleaseScene, &addr::FreeSpine, &addr::FreeCharacterModel, &addr::FreeFace, &addr::PlayerPtr,
                          &addr::CharMgrPtr, &addr::LevelsPtr, &addr::SaveObject, &addr::CharDefTable, &addr::GuiPtr, &addr::FrameDt, &addr::SmoothRate,
                          &addr::WheelPulse, &addr::WheelX, &addr::WheelY, &addr::WheelCountCopy, &addr::WheelCount, &addr::SinTable, &addr::ToaIcons,
-                         &addr::PirakaIcons, &addr::UpgradeSprite, &addr::HudPtr, &addr::MaterialTable, &addr::MaterialTableEnd}))
+                         &addr::PirakaIcons, &addr::UpgradeSprite, &addr::HudPtr, &addr::MaterialTable, &addr::MaterialTableEnd,
+                         &addr::PlayerDeathStart, &addr::PlayerDeathUpdate, &addr::PlayerRestoreSlot, &addr::PlayerBuildParty,
+                         &addr::HudUpdate}))
         return false;
 
     if (!HooksInit())

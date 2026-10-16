@@ -13,20 +13,26 @@ by default.
 - **Vezon is added, not swapped in.** So with Vezon unlocked, you can have up to 8 playable characters now (6 Toa + Zone Boss + Vezon).
 - **Due to this, Vezon no longer uses the bosses' powers.** The zone boss's constructions belong to the boss
   again: Vezon keeps his own black ones.
+- **Each of them has his own mask.** If the zone boss dies, only he is gone and Vezon stays, and the
+  other way round. Both come back with the rest of the team, as usual.
 
 ### Skippable cutscenes
 
 - **In-level cutscenes can be skipped** with **Esc** or **Space**.
+- **No startup movies.** The Eidos / Traveller's Tales logos and the story intro don't play at
+  startup, and the LEGO Star Wars advert doesn't play on the idle title menu. Each can be turned back on
+  separately.
 
 ### Pause menu
 
 - **Esc closes the pause menu** and resumes the game, like "Resume". In submenus Esc still goes
   one level up.
 
-### Shop
+### Menus
 
-- **Purchase confirmations start on YES**, so buying takes one key press less. Other YES/NO
-  prompts (like quitting the game) still start on NO.
+- **Confirmations start on the first option**: YES when buying in the shop and when saving or
+  loading a game, QUIT on the quit prompts, EXIT LEVEL after beating a boss. The game starts them all
+  on the second option.
 
 ### Display
 
@@ -40,6 +46,10 @@ by default.
 - **Thok's ice beam damages enemies.** In the original game it never does: his weapon has a small
   fire delay, so it doesn't fire every frame, the beam keeps restarting and never reaches a damage
   tick. Now it fires every frame like Vezok's beam and deals the same damage.
+- **Nuparu dig spots look right everywhere.** In some levels (e.g. the third ice level) the game's
+  data gives the dig spot's earth mound and grass a tiny grey placeholder texture, so it is a lump of
+  flat grey quads. The mod gives them the earth and grass of the other levels, taken from your own
+  `bionicle.dat`.
 
 ### Diagnostics
 
@@ -82,11 +92,16 @@ InstantSwap = 1           ; no hitch when switching between the boss and Vezon
 Enabled = 1               ; in-level cutscenes can be skipped with Esc
 ExtraKeys = Space         ; more skip keys, comma-separated (empty = Esc only)
 
+[Intro]
+SkipLogos = 1             ; no Eidos / TT logo movies at startup
+SkipIntro = 1             ; no story intro movie at startup
+SkipAttract = 1           ; no LEGO Star Wars advert on the idle title menu
+
 [PauseMenu]
 EscResumes = 1            ; Esc on the pause menu's top level resumes the game
 
-[Shop]
-ConfirmDefaultYes = 1     ; the shop's "buy?" confirmation starts on YES
+[Menus]
+ConfirmDefaultYes = 1     ; confirmations start on YES / QUIT / EXIT LEVEL (shop, save/load, quit)
 
 [Display]
 ResolutionList = 1        ; video options list the monitor's resolutions
@@ -96,6 +111,7 @@ RefreshRate = 0           ; fixed refresh rate in Hz (0 = same as Windows)
 
 [Fixes]
 ThokBeamDamage = 1        ; Thok's ice beam damages enemies
+DigSpotGrass = 1          ; Nuparu dig spots get earth and grass instead of grey quads
 
 [Debug]
 HangWatchdog = 1          ; log where the game is stuck if it freezes

@@ -60,6 +60,29 @@ constexpr size_t kHintCheckLowTypesLen = 13;
 inline const uintptr_t& kHintCheckBossTypes = addr::HintCheckBossTypes;  // 0x466d70
 constexpr size_t kHintCheckBossTypesLen = 14;
 
+// The HUD update reads the construction nearby from the player: [[player+0x1430]+0x48] = piece.
+constexpr uintptr_t kPlayerNearConstruction = 0x1430;
+constexpr uintptr_t kNearConstructionPiece = 0x48;
+
+// Deaths. PlayerDeathStart runs once (wheel icon out, death length +0x1298: 2 s, or 5 s when no other
+// character is left), then PlayerDeathUpdate every frame until the timer ends: the slot is locked
+// with 20.0 and the game switches to the party's next character, or, with nobody left, rebuilds the
+// whole party from the save (BuildParty). A locked slot comes back by PlayerRestoreSlot (mask
+// pickups, which never exist for slot 6) or BuildParty.
+constexpr uintptr_t kPlayerDeathTimer = 0x1480;  // float, 0 = not dying
+constexpr uintptr_t kPlayerMaskDropped = 0x12e8; // uint8[7], the lost mask's pickup is out in the level
+constexpr float kMaskLostLock = 20.0f;           // 0x605ae8, lock value of a slot whose character died
+inline const uintptr_t& kPlayerDeathStart = addr::PlayerDeathStart;  // 0x493910 void __fastcall(player)
+inline const uintptr_t& kPlayerDeathUpdate = addr::PlayerDeathUpdate;  // 0x499150 void __thiscall(player, pad)
+inline const uintptr_t& kPlayerRestoreSlot = addr::PlayerRestoreSlot;  // 0x4974b0 void __thiscall(player, slot)
+inline const uintptr_t& kPlayerBuildParty = addr::PlayerBuildParty;  // 0x4971a0 void __thiscall(player, int)
+inline const uintptr_t& kHudUpdate = addr::HudUpdate;  // 0x466af0 void __thiscall(hud, a, b), every frame
+using PlayerDeathStart_t = void(__fastcall*)(void* player);
+using PlayerDeathUpdate_t = void(__thiscall*)(void* player, void* pad);
+using PlayerRestoreSlot_t = void(__thiscall*)(void* player, int slot);
+using PlayerBuildParty_t = void(__thiscall*)(void* player, int arg);
+using HudUpdate_t = void(__thiscall*)(void* hud, void* a, void* b);
+
 // Pad fields.
 constexpr uintptr_t kPadPressed = 0x3c;          // bit0/bit1 = next character, bit2 = previous
 

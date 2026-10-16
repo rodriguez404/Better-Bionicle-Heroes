@@ -21,14 +21,16 @@ add_library(BetterBionicleHeroes SHARED
   src/addresses.cpp
   src/beam_fix.cpp
   src/cutscene_skip.cpp
+  src/dig_grass.cpp
   src/display.cpp
   src/dllmain.cpp
   src/hooks.cpp
+  src/intro_skip.cpp
   src/log.cpp
   src/mem.cpp
   src/pause_menu.cpp
   src/piraka_cache.cpp
-  src/shop_confirm.cpp
+  src/confirm_yes.cpp
   src/vezon_extra.cpp
   src/watchdog.cpp
 )

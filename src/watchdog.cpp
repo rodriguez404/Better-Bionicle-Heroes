@@ -9,6 +9,8 @@
 #include <windows.h>
 
 #include <cstdio>
+#include <cstring>
+#include <intrin.h>
 
 namespace
 {
@@ -100,12 +102,149 @@ void DumpThread(DWORD threadId)
     }
 }
 
+void LogStack(const char* prefix, const CONTEXT& ctx)
+{
+    char where[160] = "?";
+    if (!DescribeCodeAddress(ctx.Eip, where, sizeof(where)))
+        std::snprintf(where, sizeof(where), "%08lX (no module)", ctx.Eip);
+    Log("%s EIP %s  EAX=%08lX EBX=%08lX ECX=%08lX EDX=%08lX ESI=%08lX EDI=%08lX EBP=%08lX ESP=%08lX", prefix, where,
+        ctx.Eax, ctx.Ebx, ctx.Ecx, ctx.Edx, ctx.Esi, ctx.Edi, ctx.Ebp, ctx.Esp);
+    int listed = 0;
+    for (DWORD i = 0; i < 1024 && listed < 24; ++i)
+    {
+        DWORD value = 0;
+        SIZE_T read = 0;
+        if (!ReadProcessMemory(GetCurrentProcess(), reinterpret_cast<LPCVOID>(static_cast<uintptr_t>(ctx.Esp + i * 4)),
+                               &value, sizeof(value), &read) ||
+            read != sizeof(value))
+            break;
+        char desc[160];
+        if (value > 0x10000 && DescribeCodeAddress(value, desc, sizeof(desc)))
+        {
+            Log("%s   [esp+%03X] %s", prefix, static_cast<unsigned>(i * 4), desc);
+            ++listed;
+        }
+    }
+}
+
+// Stack overflows and jumps to garbage (EIP outside every module): the faulting thread may have no stack
+// left, so the handler only copies the context and the stack into a static buffer and lets the watchdog
+// thread (own stack) write the log.
+struct CrashCapture
+{
+    DWORD code;
+    CONTEXT ctx;
+    DWORD words;
+    DWORD stack[16384];  // 64 KB above ESP
+};
+CrashCapture g_crash;
+HANDLE g_crashReady = nullptr;
+HANDLE g_crashLogged = nullptr;
+volatile LONG g_crashTaken = 0;
+
+bool InAnyModule(DWORD address)
+{
+    HMODULE module = nullptr;
+    return GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                              reinterpret_cast<LPCSTR>(static_cast<uintptr_t>(address)), &module) &&
+           module;
+}
+
+LONG CALLBACK OnException(EXCEPTION_POINTERS* info)
+{
+    const DWORD code = info->ExceptionRecord->ExceptionCode;
+    const bool interesting = code == EXCEPTION_STACK_OVERFLOW ||
+                             (code == EXCEPTION_ACCESS_VIOLATION && !InAnyModule(info->ContextRecord->Eip));
+    if (!interesting || !g_crashReady || InterlockedExchange(&g_crashTaken, 1) != 0)
+        return EXCEPTION_CONTINUE_SEARCH;
+    g_crash.code = code;
+    g_crash.ctx = *info->ContextRecord;
+    const DWORD esp = info->ContextRecord->Esp;
+    const DWORD stackBase = __readfsdword(4);  // TEB StackBase
+    DWORD words = esp < stackBase ? (stackBase - esp) / 4 : 0;
+    if (words > 16384)
+        words = 16384;
+    std::memcpy(g_crash.stack, reinterpret_cast<const void*>(static_cast<uintptr_t>(esp)), words * 4);
+    g_crash.words = words;
+    SetEvent(g_crashReady);
+    WaitForSingleObject(g_crashLogged, 5000);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+void LogCapturedCrash()
+{
+    const CONTEXT& ctx = g_crash.ctx;
+    char where[160];
+    if (!DescribeCodeAddress(ctx.Eip, where, sizeof(where)))
+        std::snprintf(where, sizeof(where), "%08lX (no module)", ctx.Eip);
+    Log("crash: %s, EIP %s  EAX=%08lX EBX=%08lX ECX=%08lX EDX=%08lX ESI=%08lX EDI=%08lX EBP=%08lX ESP=%08lX, %lu stack words",
+        g_crash.code == EXCEPTION_STACK_OVERFLOW ? "stack overflow" : "access violation", where, ctx.Eax, ctx.Ebx,
+        ctx.Ecx, ctx.Edx, ctx.Esi, ctx.Edi, ctx.Ebp, ctx.Esp, g_crash.words);
+    int listed = 0;
+    for (DWORD i = 0; i < g_crash.words && listed < 32; ++i)
+    {
+        char desc[160];
+        if (g_crash.stack[i] > 0x10000 && DescribeCodeAddress(g_crash.stack[i], desc, sizeof(desc)))
+        {
+            Log("crash:   [esp+%04X] %s", static_cast<unsigned>(i * 4), desc);
+            ++listed;
+        }
+    }
+    // Code addresses that repeat in the stack (recursion).
+    struct Count
+    {
+        DWORD value;
+        int n;
+    };
+    static Count counts[512];
+    int distinct = 0;
+    for (DWORD i = 0; i < g_crash.words; ++i)
+    {
+        const DWORD v = g_crash.stack[i];
+        if (v <= 0x10000 || !InAnyModule(v))
+            continue;
+        int k = 0;
+        while (k < distinct && counts[k].value != v)
+            ++k;
+        if (k == distinct && distinct < 512)
+            counts[distinct++] = {v, 0};
+        if (k < distinct)
+            ++counts[k].n;
+    }
+    for (int round = 0; round < 8; ++round)
+    {
+        int best = -1;
+        for (int k = 0; k < distinct; ++k)
+            if (counts[k].n > 1 && (best < 0 || counts[k].n > counts[best].n))
+                best = k;
+        if (best < 0)
+            break;
+        char desc[160];
+        DescribeCodeAddress(counts[best].value, desc, sizeof(desc));
+        Log("crash:   repeated %d x %s", counts[best].n, desc);
+        counts[best].n = 0;
+    }
+}
+
+LONG WINAPI OnUnhandled(EXCEPTION_POINTERS* info)
+{
+    Log("crash: unhandled exception %08lX at %08lX", info->ExceptionRecord->ExceptionCode,
+        static_cast<unsigned long>(reinterpret_cast<uintptr_t>(info->ExceptionRecord->ExceptionAddress)));
+    LogStack("crash:", *info->ContextRecord);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
 DWORD WINAPI WatchdogMain(LPVOID)
 {
     int dumpsThisHang = 0;
     for (;;)
     {
-        Sleep(2000);
+        if (WaitForSingleObject(g_crashReady, 2000) == WAIT_OBJECT_0)
+        {
+            LogCapturedCrash();
+            SetEvent(g_crashLogged);
+            continue;
+        }
         const HWND hwnd = FindGameWindow();
         if (!hwnd)
             continue;
@@ -130,6 +269,10 @@ DWORD WINAPI WatchdogMain(LPVOID)
 
 void StartHangWatchdog()
 {
+    g_crashReady = CreateEventA(nullptr, FALSE, FALSE, nullptr);
+    g_crashLogged = CreateEventA(nullptr, FALSE, FALSE, nullptr);
     if (HANDLE thread = CreateThread(nullptr, 0, WatchdogMain, nullptr, 0, nullptr))
         CloseHandle(thread);
+    AddVectoredExceptionHandler(1, OnException);
+    SetUnhandledExceptionFilter(OnUnhandled);
 }
