@@ -20,10 +20,12 @@ target_include_directories(minhook PUBLIC third_party/minhook/include)
 add_library(BetterBionicleHeroes SHARED
   src/addresses.cpp
   src/beam_fix.cpp
+  src/checkpoint_restart.cpp
   src/cutscene_skip.cpp
   src/dig_grass.cpp
   src/display.cpp
   src/dllmain.cpp
+  src/gui_script.cpp
   src/hooks.cpp
   src/intro_skip.cpp
   src/log.cpp

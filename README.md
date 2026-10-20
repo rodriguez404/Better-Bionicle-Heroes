@@ -27,6 +27,9 @@ by default.
 
 - **Esc closes the pause menu** and resumes the game, like "Resume". In submenus Esc still goes
   one level up.
+- **Restart from Checkpoint.** A new pause menu entry in levels (after a Yes / No confirmation)
+  takes the team back to the last checkpoint with every mask, like losing the last mask does, but
+  without the death and without losing studs. Before the first checkpoint it is the level's start.
 
 ### Menus
 
@@ -53,9 +56,9 @@ by default.
 
 ### Diagnostics
 
-- **Hang log.** If the game freezes, the mod writes where it is stuck to
-  `BetterBionicleHeroes.log` (wait ~20 s before closing the game). It does nothing otherwise.
-  — `[Debug] HangWatchdog`
+- **Hang and crash log.** If the game freezes, the mod writes where it is stuck to
+  `BetterBionicleHeroes.log` (wait ~20 s before closing the game); if it crashes, where it crashed.
+  It does nothing otherwise. — `[Debug] HangWatchdog`
 
 ## Requirements
 
@@ -99,6 +102,7 @@ SkipAttract = 1           ; no LEGO Star Wars advert on the idle title menu
 
 [PauseMenu]
 EscResumes = 1            ; Esc on the pause menu's top level resumes the game
+RestartCheckpoint = 1     ; "Restart from Checkpoint" in the pause menu of a level
 
 [Menus]
 ConfirmDefaultYes = 1     ; confirmations start on YES / QUIT / EXIT LEVEL (shop, save/load, quit)
@@ -114,7 +118,7 @@ ThokBeamDamage = 1        ; Thok's ice beam damages enemies
 DigSpotGrass = 1          ; Nuparu dig spots get earth and grass instead of grey quads
 
 [Debug]
-HangWatchdog = 1          ; log where the game is stuck if it freezes
+HangWatchdog = 1          ; log where the game is stuck if it freezes, or where it crashed
 ```
 
 ## Building

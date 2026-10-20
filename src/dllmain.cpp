@@ -7,10 +7,12 @@
 
 #include "addresses.h"
 #include "beam_fix.h"
+#include "checkpoint_restart.h"
 #include "confirm_yes.h"
 #include "cutscene_skip.h"
 #include "dig_grass.h"
 #include "display.h"
+#include "gui_script.h"
 #include "intro_skip.h"
 #include "log.h"
 #include "pause_menu.h"
@@ -64,6 +66,13 @@ void Init()
 
     if (GetPrivateProfileIntA("PauseMenu", "EscResumes", 1, ini.c_str()) != 0)
         InstallPauseMenuEsc();
+
+    // GUI script additions are collected first and hooked once.
+    bool guiScript = false;
+    if (GetPrivateProfileIntA("PauseMenu", "RestartCheckpoint", 1, ini.c_str()) != 0)
+        guiScript = InstallCheckpointRestart() || guiScript;
+    if (guiScript)
+        InstallGuiScript();
 
     if (GetPrivateProfileIntA("Menus", "ConfirmDefaultYes", 1, ini.c_str()) != 0)
         InstallConfirmYes();

@@ -70,6 +70,10 @@ constexpr uintptr_t kNearConstructionPiece = 0x48;
 // whole party from the save (BuildParty). A locked slot comes back by PlayerRestoreSlot (mask
 // pickups, which never exist for slot 6) or BuildParty.
 constexpr uintptr_t kPlayerDeathTimer = 0x1480;  // float, 0 = not dying
+constexpr uintptr_t kPlayerDeathFade = 0x147c;   // float, 1 when not dying
+constexpr uintptr_t kPlayerPendingSlot = 0x12a8; // int, slot whose death is running (-1)
+constexpr uintptr_t kPlayerHealth = 0x12c8;      // float
+constexpr uintptr_t kPlayerMaxHealth = 0xb10;    // int
 constexpr uintptr_t kPlayerMaskDropped = 0x12e8; // uint8[7], the lost mask's pickup is out in the level
 constexpr float kMaskLostLock = 20.0f;           // 0x605ae8, lock value of a slot whose character died
 inline const uintptr_t& kPlayerDeathStart = addr::PlayerDeathStart;  // 0x493910 void __fastcall(player)

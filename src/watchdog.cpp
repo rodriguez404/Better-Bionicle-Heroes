@@ -1,6 +1,7 @@
 // Hang diagnostics: when Windows reports the game window as hung, log where the window's thread is
 // (EIP plus return-address candidates from its stack, with module names) a few times, so a freeze
-// can be attributed without a debugger attached.
+// can be attributed without a debugger attached. Crashes (stack overflow, a jump outside every module,
+// any unhandled exception) are logged the same way.
 
 #include "watchdog.h"
 
@@ -142,6 +143,45 @@ HANDLE g_crashReady = nullptr;
 HANDLE g_crashLogged = nullptr;
 volatile LONG g_crashTaken = 0;
 
+// The first fault of a burst (more than 2 s after the previous one), kept quietly: a fault inside the
+// game's own exception handler recurses into a stack overflow, and only this one shows what went
+// wrong in the first place.
+struct FaultCapture
+{
+    DWORD code;
+    DWORD tick;
+    DWORD faultAddress;  // address read or written (access violation)
+    CONTEXT ctx;
+    DWORD words;
+    DWORD stack[512];
+};
+FaultCapture g_fault;
+DWORD g_lastFaultTick = 0;
+volatile LONG g_faultBusy = 0;
+
+void RememberFault(const EXCEPTION_POINTERS* info)
+{
+    const DWORD now = GetTickCount();
+    const bool newBurst = g_lastFaultTick == 0 || now - g_lastFaultTick > 2000;
+    g_lastFaultTick = now;
+    if (!newBurst || InterlockedExchange(&g_faultBusy, 1) != 0)
+        return;
+    g_fault.code = info->ExceptionRecord->ExceptionCode;
+    g_fault.tick = now;
+    g_fault.faultAddress = info->ExceptionRecord->NumberParameters >= 2
+                               ? static_cast<DWORD>(info->ExceptionRecord->ExceptionInformation[1])
+                               : 0;
+    g_fault.ctx = *info->ContextRecord;
+    const DWORD esp = info->ContextRecord->Esp;
+    const DWORD stackBase = __readfsdword(4);
+    DWORD words = esp < stackBase ? (stackBase - esp) / 4 : 0;
+    if (words > 512)
+        words = 512;
+    std::memcpy(g_fault.stack, reinterpret_cast<const void*>(static_cast<uintptr_t>(esp)), words * 4);
+    g_fault.words = words;
+    InterlockedExchange(&g_faultBusy, 0);
+}
+
 bool InAnyModule(DWORD address)
 {
     HMODULE module = nullptr;
@@ -153,6 +193,9 @@ bool InAnyModule(DWORD address)
 LONG CALLBACK OnException(EXCEPTION_POINTERS* info)
 {
     const DWORD code = info->ExceptionRecord->ExceptionCode;
+    if (code == EXCEPTION_ACCESS_VIOLATION || code == EXCEPTION_ILLEGAL_INSTRUCTION ||
+        code == EXCEPTION_INT_DIVIDE_BY_ZERO || code == EXCEPTION_PRIV_INSTRUCTION || code == EXCEPTION_IN_PAGE_ERROR)
+        RememberFault(info);
     const bool interesting = code == EXCEPTION_STACK_OVERFLOW ||
                              (code == EXCEPTION_ACCESS_VIOLATION && !InAnyModule(info->ContextRecord->Eip));
     if (!interesting || !g_crashReady || InterlockedExchange(&g_crashTaken, 1) != 0)
@@ -223,6 +266,27 @@ void LogCapturedCrash()
         DescribeCodeAddress(counts[best].value, desc, sizeof(desc));
         Log("crash:   repeated %d x %s", counts[best].n, desc);
         counts[best].n = 0;
+    }
+
+    // What started it.
+    if (g_fault.tick == 0)
+        return;
+    const CONTEXT& f = g_fault.ctx;
+    if (!DescribeCodeAddress(f.Eip, where, sizeof(where)))
+        std::snprintf(where, sizeof(where), "%08lX (no module)", f.Eip);
+    Log("crash: first fault %lu ms before: %08lX at %s, address %08lX  EAX=%08lX EBX=%08lX ECX=%08lX EDX=%08lX "
+        "ESI=%08lX EDI=%08lX EBP=%08lX ESP=%08lX",
+        GetTickCount() - g_fault.tick, g_fault.code, where, g_fault.faultAddress, f.Eax, f.Ebx, f.Ecx, f.Edx, f.Esi,
+        f.Edi, f.Ebp, f.Esp);
+    listed = 0;
+    for (DWORD i = 0; i < g_fault.words && listed < 24; ++i)
+    {
+        char desc[160];
+        if (g_fault.stack[i] > 0x10000 && DescribeCodeAddress(g_fault.stack[i], desc, sizeof(desc)))
+        {
+            Log("crash:   [esp+%04X] %s", static_cast<unsigned>(i * 4), desc);
+            ++listed;
+        }
     }
 }
 
